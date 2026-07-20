@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Activity, AlertTriangle, IndianRupee, Users } from "lucide-react";
+import { Activity, AlertTriangle, IndianRupee, Users, UserPlus, CheckCircle2, CreditCard, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { AppHeader } from "../components/AppHeader";
 import { AttendanceSummaryCard } from "../components/AttendanceSummaryCard";
@@ -19,6 +20,8 @@ import {
 } from "./mockReports";
 
 export default function ReportsPage() {
+  const router = useRouter();
+
   // ---- Computed KPIs ----
   const kpis = useMemo(() => {
     const totalRevenue = Object.values(mockRevenueTrends)
@@ -34,6 +37,53 @@ export default function ReportsPage() {
   }, []);
 
   const hasExpiringSoon = mockExpiringMemberships.length;
+
+  // Mock activity data
+  const activityLogs = [
+    {
+      id: 1,
+      type: "join",
+      memberName: "Rahul Gupta",
+      description: "Joined with Platinum plan",
+      timestamp: "10 min ago",
+      icon: UserPlus,
+      color: "bg-blue-50 text-blue-600",
+    },
+    {
+      id: 2,
+      type: "renewal",
+      memberName: "Priya Singh",
+      description: "Renewed Premium membership for 6 months",
+      timestamp: "2 hours ago",
+      icon: CheckCircle2,
+      color: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      id: 3,
+      type: "payment",
+      memberName: "Amit Kumar",
+      description: "Payment received for Classic plan",
+      timestamp: "5 hours ago",
+      icon: CreditCard,
+      color: "bg-purple-50 text-purple-600",
+    },
+    {
+      id: 4,
+      type: "expired",
+      memberName: "Sneha Patel",
+      description: "Membership expired, pending renewal",
+      timestamp: "1 day ago",
+      icon: Activity,
+      color: "bg-rose-50 text-rose-600",
+    },
+  ];
+
+  const quickActions = [
+    { label: "View Members", icon: Users, color: "from-blue-600 to-blue-700", route: "/members" },
+    { label: "Renew Membership", icon: CheckCircle2, color: "from-emerald-600 to-emerald-700", route: "/renewals/add" },
+    { label: "Payment History", icon: CreditCard, color: "from-purple-600 to-purple-700", route: "/payment-history" },
+    { label: "Attendance", icon: Activity, color: "from-amber-600 to-amber-700", route: "/attendance" },
+  ];
 
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">
@@ -85,7 +135,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-slate-900">Attendance Overview</p>
-                <p className="text-sm text-slate-500">This week's check-in percentage</p>
+                <p className="text-sm text-slate-500">This week&#39;s check-in percentage</p>
               </div>
             </div>
 
@@ -139,7 +189,6 @@ export default function ReportsPage() {
             <div className="mt-5 space-y-4">
               {mockMembershipStats.map((tier, i) => {
                 const colorClass = tier.color.split(" ")[0]; // e.g. "bg-blue-600"
-                const textColor = tier.color.split(" ")[1]; // e.g. "text-blue-600"
                 return (
                   <motion.div
                     key={tier.tier}
@@ -215,6 +264,70 @@ export default function ReportsPage() {
                 );
               })}
             </div>
+          </section>
+
+          {/* -------- Recent Activity Timeline -------- */}
+          <section className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Recent Activity</p>
+                <p className="text-sm text-slate-500">Latest membership events</p>
+              </div>
+              <button className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700">
+                View All
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {activityLogs.map((activity, idx) => {
+                const Icon = activity.icon;
+                return (
+                  <motion.div
+                    key={activity.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.5 + idx * 0.05 }}
+                    className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-3 hover:bg-slate-50 transition"
+                  >
+                    <div className={`rounded-2xl p-2 ${activity.color}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-slate-900">{activity.memberName}</p>
+                        <p className="shrink-0 text-xs text-slate-500">{activity.timestamp}</p>
+                      </div>
+                      <p className="mt-0.5 text-sm text-slate-600">{activity.description}</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* -------- Quick Actions -------- */}
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {quickActions.map((action, idx) => {
+              const Icon = action.icon;
+              return (
+                <motion.button
+                  key={idx}
+                  onClick={() => router.push(action.route)}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.7 + idx * 0.05 }}
+                  whileHover={{ y: -4 }}
+                  className={`group rounded-[1.6rem] bg-gradient-to-br ${action.color} p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition-all hover:shadow-[0_15px_45px_rgba(15,23,42,0.12)] sm:p-5`}
+                >
+                  <div className="rounded-2xl bg-white/20 p-3 w-fit group-hover:bg-white/30 transition">
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                  <p className="mt-3 text-left text-sm font-semibold text-white">{action.label}</p>
+                  <p className="mt-1 text-left text-xs text-white/70 group-hover:text-white/90">Quick access</p>
+                </motion.button>
+              );
+            })}
           </section>
 
           {/* -------- Quick Insights -------- */}

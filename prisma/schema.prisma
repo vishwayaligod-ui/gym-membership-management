@@ -1,0 +1,564 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GymStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  GYM_OWNER
+  BRANCH_MANAGER
+  RECEPTIONIST
+  TRAINER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  FROZEN
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  FROZEN
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+  CHEQUE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
+}
+
+enum ExpenseCategory {
+  RENT
+  SALARY
+  UTILITIES
+  MAINTENANCE
+  SUPPLIES
+  MARKETING
+  OTHER
+}
+
+enum PTSessionStatus {
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+model Gym {
+  id       String    @id @default(uuid())
+  name     String
+  code     String    @unique
+  email    String    @unique
+  phone    String?
+  logo     String?
+  address  String?
+  city     String?
+  state    String?
+  country  String?
+  pincode  String?
+  timezone String    @default("Asia/Kolkata")
+  currency String    @default("INR")
+  status   GymStatus @default(ACTIVE)
+
+  branches        Branch[]
+  users           User[]
+  members         Member[]
+  membershipPlans MembershipPlan[]
+  memberships     Membership[]
+  payments        Payment[]
+  trainerProfiles TrainerProfile[]
+  attendances     Attendance[]
+  expenses        Expense[]
+  workoutPlans    WorkoutPlan[]
+  dietPlans       DietPlan[]
+  ptPackages      PTPackage[]
+  ptSessions      PTSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Branch {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  name String
+  code String
+
+  email String?
+  phone String?
+
+  address String?
+  city    String?
+  state   String?
+  country String?
+  pincode String?
+
+  isActive Boolean @default(true)
+
+  users        User[]
+  members      Member[]
+  memberships  Membership[]
+  payments     Payment[]
+  attendances  Attendance[]
+  expenses     Expense[]
+  workoutPlans WorkoutPlan[]
+  dietPlans    DietPlan[]
+  ptSessions   PTSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([gymId, code])
+  @@index([gymId])
+}
+
+model User {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  fullName String
+  email    String  @unique
+  phone    String?
+
+  password String
+
+  role UserRole
+
+  isActive Boolean @default(true)
+
+  trainerProfile     TrainerProfile?
+  createdAttendances Attendance[]    @relation("AttendanceCreatedBy")
+  createdExpenses    Expense[]       @relation("ExpenseCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+}
+
+model TrainerProfile {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  specialization   String?
+  experienceYears  Int?
+  salary           Decimal?  @db.Decimal(10, 2)
+  joiningDate      DateTime?
+  certifications   String?
+  bio              String?
+  emergencyContact String?
+  isActive         Boolean   @default(true)
+
+  workoutPlans WorkoutPlan[]
+  dietPlans    DietPlan[]
+  ptSessions   PTSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([isActive])
+}
+
+model Member {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  memberCode String
+
+  firstName String
+  lastName  String?
+
+  gender Gender
+
+  dateOfBirth DateTime?
+
+  phone String
+  email String?
+
+  address String?
+
+  emergencyName  String?
+  emergencyPhone String?
+
+  joiningDate DateTime @default(now())
+
+  status MemberStatus @default(ACTIVE)
+
+  photo String?
+
+  notes String?
+
+  memberships  Membership[]
+  payments     Payment[]
+  attendances  Attendance[]
+  workoutPlans WorkoutPlan[]
+  dietPlans    DietPlan[]
+  ptSessions   PTSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([gymId, memberCode])
+  @@index([gymId])
+  @@index([branchId])
+  @@index([status])
+}
+
+model MembershipPlan {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  name String
+
+  durationInDays Int
+
+  price Decimal @db.Decimal(10, 2)
+
+  joiningFee Decimal @default(0) @db.Decimal(10, 2)
+
+  description String?
+
+  freezeDays Int @default(0)
+
+  isActive Boolean @default(true)
+
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+}
+
+model Membership {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  startDate DateTime
+  endDate   DateTime
+
+  amount Decimal @db.Decimal(10, 2)
+
+  discount Decimal @default(0) @db.Decimal(10, 2)
+
+  finalAmount Decimal @db.Decimal(10, 2)
+
+  status MembershipStatus @default(ACTIVE)
+
+  remarks String?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([memberId])
+  @@index([planId])
+  @@index([status])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  membershipId String
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(10, 2)
+
+  paymentMode PaymentMode
+
+  paymentStatus PaymentStatus
+
+  transactionId String?
+
+  paymentDate DateTime @default(now())
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([memberId])
+  @@index([membershipId])
+  @@index([paymentStatus])
+  @@index([paymentDate])
+}
+
+model Attendance {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("AttendanceCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  attendanceDate DateTime
+  checkIn        DateTime?
+  checkOut       DateTime?
+  status         AttendanceStatus @default(PRESENT)
+  remarks        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([memberId])
+  @@index([attendanceDate])
+  @@index([status])
+}
+
+model Expense {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  category      ExpenseCategory
+  title         String
+  amount        Decimal         @db.Decimal(10, 2)
+  paymentMode   PaymentMode
+  vendor        String?
+  invoiceNumber String?
+  expenseDate   DateTime
+  remarks       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([expenseDate])
+  @@index([category])
+  @@index([paymentMode])
+}
+
+model WorkoutPlan {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  trainerProfileId String
+  trainerProfile   TrainerProfile @relation(fields: [trainerProfileId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  startDate DateTime
+  endDate   DateTime
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([trainerProfileId])
+  @@index([memberId])
+  @@index([isActive])
+}
+
+model DietPlan {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  trainerProfileId String
+  trainerProfile   TrainerProfile @relation(fields: [trainerProfileId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  calories Int?
+  protein  Int?
+  carbs    Int?
+  fat      Int?
+
+  startDate DateTime
+  endDate   DateTime
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([trainerProfileId])
+  @@index([memberId])
+  @@index([isActive])
+}
+
+model PTPackage {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  name String
+
+  numberOfSessions Int
+
+  price Decimal @db.Decimal(10, 2)
+
+  durationInDays Int
+
+  description String?
+
+  isActive Boolean @default(true)
+
+  ptSessions PTSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([isActive])
+}
+
+model PTSession {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  trainerProfileId String
+  trainerProfile   TrainerProfile @relation(fields: [trainerProfileId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  ptPackageId String
+  ptPackage   PTPackage @relation(fields: [ptPackageId], references: [id], onDelete: Cascade)
+
+  sessionDate DateTime
+  startTime   String?
+  endTime     String?
+  status      PTSessionStatus @default(SCHEDULED)
+  remarks     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([branchId])
+  @@index([trainerProfileId])
+  @@index([memberId])
+  @@index([ptPackageId])
+  @@index([sessionDate])
+  @@index([status])
+}
