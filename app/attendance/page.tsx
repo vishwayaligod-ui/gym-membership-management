@@ -1,304 +1,642 @@
 "use client";
 
-import { Activity, AlertCircle, CalendarDays, Clock, LogOut, MessageCircle, Phone, ScanLine, Search, Users, CheckCircle2, LogIn } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
-import { AppHeader } from "../components/AppHeader";
-import { ActivityTimeline } from "../components/ActivityTimeline";
-import { AttendanceSummaryCard } from "../components/AttendanceSummaryCard";
-import { BottomNavigation } from "../components/BottomNavigation";
-import { PageContainer } from "../components/PageContainer";
-import { mockActivity, mockAttendance } from "./mockAttendance";
-import { mockMembers } from "../members/mockMembers";
+import {
+  CalendarCheck,
+  Eye,
+  Edit3,
+  Phone,
+  MessageCircle,
+  Search,
+  Timer,
+  UserCheck,
+  LogOut,
+  ArrowRight,
+} from "lucide-react";
+import type { AttendanceRecord, CheckInMember, RecentActivityItem } from "./types";
+import { Card } from "../components/v4/Card";
+import { FadeUp } from "../components/v4/MotionDiv";
+import { QuickCheckInCard } from "../components/QuickCheckInCard";
+import { Toast } from "../components/Toast";
+
+type AttendanceResponse = {
+  records: AttendanceRecord[];
+  summary: {
+    totalMembers: number;
+    checkedIn: number;
+    checkedOut: number;
+    activeNow: number;
+    peakHour: string;
+    avgDuration: string;
+  };
+};
+
+type AttendanceMembersResponse = {
+  members: CheckInMember[];
+};
 
 export default function AttendancePage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMember, setSelectedMember] = useState<typeof mockMembers[0] | null>(null);
-  const [checkedInStatus, setCheckedInStatus] = useState<Record<number, boolean>>({});
+  const [checkInSearch, setCheckInSearch] = useState("");
+  const [selectedMember, setSelectedMember] = useState<CheckInMember | null>(null);
+  const [checkInMembers, setCheckInMembers] = useState<CheckInMember[]>([]);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [summary, setSummary] = useState({
+    totalMembers: 0,
+    present: 0,
+    late: 0,
+    absent: 0,
+    checkedIn: 0,
+    checkedOut: 0,
+    peakHour: "—",
+    avgDuration: "—",
+  });
+  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>([]);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastKey, setToastKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Search functionality
-  const filteredMembers = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return mockMembers.filter(member =>
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.phone.includes(searchQuery)
-    );
-  }, [searchQuery]);
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setToastKey((k) => k + 1);
+  }, []);
 
-  const handleCheckIn = (memberId: number) => {
-    setCheckedInStatus(prev => ({
-      ...prev,
-      [memberId]: !prev[memberId]
-    }));
-  };
+  const hideToast = useCallback(() => {
+    setToastVisible(false);
+  }, []);
 
-  const handleSelectMember = (member: typeof mockMembers[0]) => {
-    setSelectedMember(member);
-    setSearchQuery("");
-  };
+  const loadAttendance = useCallback(async (date?: string) => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      if (checkInSearch.trim()) params.set("search", checkInSearch.trim());
+      if (date) params.set("date", date);
 
-  const isCheckedIn = selectedMember ? checkedInStatus[selectedMember.id] : false;
+      const response = await fetch(`/api/attendance?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Failed to load attendance");
+      }
+
+      const data: AttendanceResponse = await response.json();
+      setRecords(data.records || []);
+      setSummary((prev) => ({ ...prev, ...data.summary }));
+      setRecentActivity([]);
+    } catch (error) {
+      console.error("Failed to load attendance", error);
+      showToast("Unable to load attendance data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [checkInSearch, showToast]);
+
+  const loadMembers = useCallback(async (searchTerm = checkInSearch) => {
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm.trim()) {
+        params.set("search", searchTerm.trim());
+      }
+
+      const response = await fetch(`/api/attendance/members?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Failed to load members");
+      }
+
+      const data: AttendanceMembersResponse = await response.json();
+      setCheckInMembers(data.members || []);
+    } catch (error) {
+      console.error("Failed to load check-in members", error);
+      setCheckInMembers([]);
+    }
+  }, [checkInSearch]);
+
+  const handleCheckIn = useCallback(
+    async (member: CheckInMember) => {
+      try {
+        setIsSubmitting(true);
+        const response = await fetch("/api/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memberId: member.id }),
+        });
+
+        const data: { error?: string } = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to check in");
+        }
+
+        showToast(`${member.name} checked in successfully`);
+        setCheckInSearch("");
+        setSelectedMember(null);
+        await Promise.all([loadAttendance(), loadMembers("")]);
+      } catch (error) {
+        console.error("Check-in failed", error);
+        showToast(error instanceof Error ? error.message : "Check-in failed");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [loadAttendance, loadMembers, showToast]
+  );
+
+  const handleCheckOut = useCallback(
+    async (member: CheckInMember) => {
+      try {
+        setIsSubmitting(true);
+        const matchingRecord = records.find((record) => record.memberId === member.id);
+        if (!matchingRecord) {
+          throw new Error("Attendance record not found");
+        }
+
+        const response = await fetch(`/api/attendance/${matchingRecord.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        const data: { error?: string } = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to check out");
+        }
+
+        showToast(`${member.name} checked out successfully`);
+        await Promise.all([loadAttendance(), loadMembers(checkInSearch)]);
+      } catch (error) {
+        console.error("Check-out failed", error);
+        showToast(error instanceof Error ? error.message : "Check-out failed");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [checkInSearch, loadAttendance, loadMembers, records, showToast]
+  );
+
+  useEffect(() => {
+    void loadAttendance();
+  }, [loadAttendance]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadMembers(checkInSearch);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [checkInSearch, loadMembers]);
+
+  useEffect(() => {
+    if (!selectedMember) {
+      return;
+    }
+
+    const updatedMember = checkInMembers.find((member) => member.id === selectedMember.id);
+    if (updatedMember) {
+      setSelectedMember(updatedMember);
+    }
+  }, [checkInMembers, selectedMember]);
+
+  const checkedInCount = records.length;
+  const checkedOutCount = records.filter((r) => r.checkOut !== "—").length;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">
-      <AppHeader title="Attendance" />
+    <div className="text-[#F8FAFC]">
+      {/* ═══════════════════════════════════════════
+          HERO SECTION — Operational Header
+          ═══════════════════════════════════════════ */}
+      <section className="pb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="flex items-start justify-between"
+          >
+            <div>
+                {/* Breadcrumb */}
+                <nav className="mb-3 flex items-center gap-1.5 text-[12px]">
+                  <Link
+                    href="/dashboard"
+                    className="text-[#64748B] transition-colors duration-200 hover:text-[#3B82F6]"
+                  >
+                    Dashboard
+                  </Link>
+                  <span className="text-[#475569] select-none">›</span>
+                  <span className="text-[#94A3B8] font-medium">Attendance</span>
+                </nav>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md shadow-blue-900/20">
+                    <CalendarCheck className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3B82F6]">
+                    Focus Fitness
+                  </span>
+                </div>
+                <h1 className="text-[28px] font-bold tracking-tight text-[#F8FAFC]">
+                  Attendance Management
+                </h1>
+                <p className="mt-1 text-[14px] text-[#64748B]">
+                  {new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+          </motion.div>
+        </section>
 
-      <PageContainer>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-6 py-4"
-        >
-          {/* Header */}
-          <div>
-            <p className="text-2xl font-semibold tracking-tight text-slate-950">Check-In & Check-Out</p>
-            <p className="mt-1 text-sm text-slate-500">Manage member attendance efficiently</p>
+        {/* ═══════════════════════════════════════════
+            QUICK CHECK-IN + KPI CARDS
+            ═══════════════════════════════════════════ */}
+        <div className="pb-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            {/* Quick Check-In Card */}
+            <div className="lg:col-span-2">
+              <FadeUp delay={0.05}>
+                <QuickCheckInCard
+                  members={checkInMembers}
+                  searchQuery={checkInSearch}
+                  onSearchChange={setCheckInSearch}
+                  selectedMember={selectedMember}
+                  onSelectMember={setSelectedMember}
+                  onCheckIn={handleCheckIn}
+                  onCheckOut={handleCheckOut}
+                  isSubmitting={isSubmitting}
+                />
+              </FadeUp>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="lg:col-span-3">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <FadeUp delay={0.1}>
+                  <Card padding="md" shadow="md" className="!border-[#334155] !bg-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B82F6]/10 ring-1 ring-[#3B82F6]/20">
+                        <UserCheck className="h-5 w-5 text-[#3B82F6]" />
+                      </div>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#64748B]">
+                        Checked In
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[28px] font-bold tabular-nums text-[#F8FAFC] tracking-tight">
+                      {checkedInCount}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">
+                      Today's check-ins
+                    </p>
+                  </Card>
+                </FadeUp>
+
+                <FadeUp delay={0.15}>
+                  <Card padding="md" shadow="md" className="!border-[#334155] !bg-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-900/30 ring-1 ring-indigo-900/40">
+                        <LogOut className="h-5 w-5 text-indigo-400" />
+                      </div>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#64748B]">
+                        Checked Out
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[28px] font-bold tabular-nums text-[#F8FAFC] tracking-tight">
+                      {checkedOutCount}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">
+                      Today's check-outs
+                    </p>
+                  </Card>
+                </FadeUp>
+
+                <FadeUp delay={0.2}>
+                  <Card padding="md" shadow="md" className="!border-[#334155] !bg-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-900/30 ring-1 ring-emerald-900/40">
+                        <CalendarCheck className="h-5 w-5 text-emerald-400" />
+                      </div>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#64748B]">
+                        Active Now
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[28px] font-bold tabular-nums text-[#F8FAFC] tracking-tight">
+                      {checkedInCount - checkedOutCount}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">
+                      Currently in studio
+                    </p>
+                  </Card>
+                </FadeUp>
+
+                <FadeUp delay={0.25}>
+                  <Card padding="md" shadow="md" className="!border-[#334155] !bg-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B82F6]/10 ring-1 ring-[#3B82F6]/20">
+                        <Timer className="h-5 w-5 text-[#3B82F6]" />
+                      </div>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#64748B]">
+                        Avg Duration
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[28px] font-bold tabular-nums text-[#F8FAFC] tracking-tight">
+                      {summary.avgDuration}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[#64748B]">Peak: {summary.peakHour}</p>
+                  </Card>
+                </FadeUp>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════
+            MAIN CONTENT + SIDEBAR
+            ═══════════════════════════════════════════ */}
+        <div className="flex gap-0">
+          {/* Today's Check-Ins Table */}
+          <div className="flex-1 min-w-0">
+            {/* Section heading */}
+            <div className="pt-2 pb-3">
+              <h2 className="text-[15px] font-semibold text-[#F8FAFC]">Today's Check-Ins</h2>
+            </div>
+
+            {/* Table Header */}
+            <div className="flex items-center gap-3 border-b border-[#334155] bg-[#0F172A]/50 py-3">
+              <span className="w-[52px] shrink-0" />
+              <span className="w-40 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                Member
+              </span>
+              <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                Check In
+              </span>
+              <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                Check Out
+              </span>
+              <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                Duration
+              </span>
+              <span className="ml-auto text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                Actions
+              </span>
+            </div>
+
+            {/* Rows */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1E293B] ring-1 ring-[#334155]">
+                  <Search className="h-7 w-7 text-[#64748B]" />
+                </div>
+                <p className="mt-5 text-[15px] font-medium text-[#94A3B8]">Loading attendance...</p>
+                <p className="mt-1 text-[12px] text-[#64748B]">Fetching today&apos;s live records</p>
+              </div>
+            ) : records.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1E293B] ring-1 ring-[#334155]">
+                  <Search className="h-7 w-7 text-[#64748B]" />
+                </div>
+                <p className="mt-5 text-[15px] font-medium text-[#94A3B8]">No check-ins yet today</p>
+                <p className="mt-1 text-[12px] text-[#64748B]">
+                  Search and check in a member above to get started
+                </p>
+              </div>
+            ) : (
+              <div>
+                {records.map((record, i) => {
+                  return (
+                    <div key={record.id}>
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25, delay: i * 0.03, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex items-center gap-3 py-[14px] transition-all hover:bg-[#273449]"
+                      >
+                        {/* Avatar */}
+                        <div className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 text-[14px] font-bold text-white shadow-sm">
+                          {record.avatar}
+                        </div>
+
+                        {/* Member */}
+                        <div className="w-40">
+                          <p className="text-[14px] font-semibold text-[#F8FAFC] truncate">
+                            {record.name}
+                          </p>
+                          <p className="text-[12px] text-[#64748B] truncate">
+                            {record.plan} &middot; {record.phone}
+                          </p>
+                        </div>
+
+                        {/* Check In */}
+                        <div className="w-20">
+                          <span className="text-[14px] font-medium text-[#F8FAFC] tabular-nums tracking-tight">
+                            {record.checkIn}
+                          </span>
+                        </div>
+
+                        {/* Check Out */}
+                        <div className="w-20">
+                          <span className="text-[14px] font-medium text-[#F8FAFC] tabular-nums tracking-tight">
+                            {record.checkOut}
+                          </span>
+                        </div>
+
+                        {/* Duration */}
+                        <div className="w-20">
+                          <span className="text-[14px] font-medium text-[#F8FAFC] tabular-nums tracking-tight">
+                            {record.duration}
+                          </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="ml-auto flex items-center gap-2">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-[#3B82F6]/10 hover:text-[#3B82F6]"
+                            title="View"
+                            type="button"
+                          >
+                            <Eye className="h-[15px] w-[15px]" />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-indigo-900/30 hover:text-indigo-400"
+                            title="Edit"
+                            type="button"
+                          >
+                            <Edit3 className="h-[15px] w-[15px]" />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-emerald-900/30 hover:text-emerald-400"
+                            title="Call"
+                            type="button"
+                          >
+                            <Phone className="h-[15px] w-[15px]" />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-sky-900/30 hover:text-sky-400"
+                            title="WhatsApp"
+                            type="button"
+                          >
+                            <MessageCircle className="h-[15px] w-[15px]" />
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                      {i < records.length - 1 && (
+                        <div className="border-t border-[#334155]/60" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* 1. Search Member Section */}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.05 }}
-            className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]"
-          >
-            <label className="relative flex items-center gap-3 rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 transition focus-within:border-blue-500 focus-within:bg-white">
-              <Search className="h-5 w-5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search member by name or phone..."
-                className="w-full border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
-              />
-            </label>
-
-            {/* Search Results Dropdown */}
-            {searchQuery.trim() && filteredMembers.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-3 space-y-2"
-              >
-                {filteredMembers.map((member) => (
-                  <button
-                    key={member.id}
-                    onClick={() => handleSelectMember(member)}
-                    className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-sm font-semibold text-white">
-                        {member.avatar}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{member.name}</p>
-                        <p className="text-xs text-slate-500">{member.plan} · {member.phone}</p>
-                      </div>
-                    </div>
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${
-                      member.status === "Active"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : member.status === "Expiring"
-                        ? "bg-amber-50 text-amber-700 ring-amber-200"
-                        : "bg-rose-50 text-rose-700 ring-rose-200"
-                    }`}>
-                      {member.status}
-                    </span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </motion.section>
-
-          {/* 2. Member Preview Card */}
-          {selectedMember && (
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-gradient-to-br from-blue-50 to-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]"
-            >
-              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-lg font-bold text-white shadow-lg shadow-blue-600/20">
-                    {selectedMember.avatar}
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{selectedMember.name}</p>
-                    <p className="text-sm text-slate-600">{selectedMember.plan} · {selectedMember.phone}</p>
-                    <p className="mt-1 text-xs text-slate-500">Expires: {selectedMember.expiresOn}</p>
-                  </div>
+          {/* ═══════════════════════════════════════════
+              TODAY'S SUMMARY SIDEBAR
+              ═══════════════════════════════════════════ */}
+          <div className="hidden xl:block w-[300px] shrink-0 border-l border-[#334155] px-6 py-6">
+            <FadeUp delay={0.2}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md shadow-blue-900/20">
+                  <CalendarCheck className="h-4 w-4 text-white" />
                 </div>
-                <button
-                  onClick={() => setSelectedMember(null)}
-                  className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Change
-                </button>
+                <div>
+                  <p className="text-[13px] font-semibold text-[#F8FAFC]">Today's Summary</p>
+                  <p className="text-[11px] text-[#64748B]">
+                    {new Date().toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
               </div>
-            </motion.section>
-          )}
 
-          {/* 3. One-Tap Check-In Button */}
-          {selectedMember && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.15 }}
-              className="grid gap-3 sm:grid-cols-2"
-            >
-              <button
-                onClick={() => handleCheckIn(selectedMember.id)}
-                className={`rounded-2xl px-6 py-4 text-base font-semibold shadow-lg transition ${
-                  !isCheckedIn
-                    ? "bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700"
-                    : "border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <LogIn className="h-5 w-5" />
-                  {!isCheckedIn ? "Check In" : "Checked In"}
-                </div>
-              </button>
-              <button
-                onClick={() => handleCheckIn(selectedMember.id)}
-                className={`rounded-2xl px-6 py-4 text-base font-semibold shadow-lg transition ${
-                  isCheckedIn
-                    ? "bg-amber-600 text-white shadow-amber-600/20 hover:bg-amber-700"
-                    : "border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <LogOut className="h-5 w-5" />
-                  Check Out
-                </div>
-              </button>
-            </motion.div>
-          )}
-
-          {/* 4. Today's Attendance Stats */}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <h3 className="mb-4 text-base font-semibold text-slate-900">Today's Stats</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <AttendanceSummaryCard label="Members Present" value="84" tone="bg-emerald-100 text-emerald-600" icon={Activity} />
-              <AttendanceSummaryCard label="Checked In" value="41" tone="bg-blue-100 text-blue-600" icon={LogIn} />
-              <AttendanceSummaryCard label="Checked Out" value="32" tone="bg-orange-100 text-orange-600" icon={LogOut} />
-              <AttendanceSummaryCard label="Pending" value="11" tone="bg-amber-100 text-amber-600" icon={Clock} />
-            </div>
-          </motion.section>
-
-          {/* 5. Recent Check-ins */}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 }}
-            className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">Recent Activity</h3>
-                <p className="mt-0.5 text-sm text-slate-500">Today's latest check-ins & check-outs</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {mockActivity.map((item, index) => (
-                <motion.div
-                  key={`${item.time}-${item.name}`}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-3"
-                >
-                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                    {item.action.includes("Checked Out") ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-500">{item.action}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{item.time}</span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-
-          {/* 6. Quick Actions */}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-          >
-            <h3 className="mb-4 text-base font-semibold text-slate-900">Quick Actions</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <button className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50">
-                <Phone className="h-4 w-4" />
-                Call Member
-              </button>
-              <button className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50">
-                <MessageCircle className="h-4 w-4" />
-                Send Message
-              </button>
-              <button className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50">
-                <CalendarDays className="h-4 w-4" />
-                View Schedule
-              </button>
-            </div>
-          </motion.section>
-
-          {/* Attendance Records */}
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.35 }}
-          >
-            <h3 className="mb-4 text-base font-semibold text-slate-900">Attendance Records</h3>
-            <div className="space-y-2">
-              {mockAttendance.map((member, index) => (
-                <motion.div
-                  key={member.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 text-xs font-semibold text-white">
-                      {member.avatar}
+              {/* Summary Stats */}
+              <div className="space-y-3">
+                <Card padding="sm" shadow="sm" className="!border-[#334155] !bg-[#1E293B]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#3B82F6]/10">
+                        <UserCheck className="h-3 w-3 text-[#3B82F6]" />
+                      </div>
+                      <span className="text-[11px] font-medium text-[#64748B]">Checked In</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{member.name}</p>
-                      <p className="text-xs text-slate-500">{member.plan}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-slate-900">{member.checkInTime}</p>
-                      {member.checkOutTime && <p className="text-xs text-slate-500">{member.checkOutTime}</p>}
-                    </div>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
-                      member.status === "Present"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : member.status === "Checked Out"
-                        ? "bg-slate-50 text-slate-700 ring-slate-200"
-                        : "bg-amber-50 text-amber-700 ring-amber-200"
-                    }`}>
-                      {member.status}
+                    <span className="text-[15px] font-bold text-[#3B82F6] tabular-nums">
+                      {summary.checkedIn}
                     </span>
                   </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-        </motion.div>
-      </PageContainer>
+                </Card>
 
-      <BottomNavigation />
+                <Card padding="sm" shadow="sm" className="!border-[#334155] !bg-[#1E293B]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-900/30">
+                        <LogOut className="h-3 w-3 text-indigo-400" />
+                      </div>
+                      <span className="text-[11px] font-medium text-[#64748B]">Checked Out</span>
+                    </div>
+                    <span className="text-[15px] font-bold text-indigo-400 tabular-nums">
+                      {summary.checkedOut}
+                    </span>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Quick Insights */}
+              <div className="mt-6">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                  Quick Insights
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                    <span className="text-[12px] text-[#64748B]">Checked In</span>
+                    <span className="text-[13px] font-semibold text-[#F8FAFC] tabular-nums">
+                      {summary.checkedIn}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                    <span className="text-[12px] text-[#64748B]">Checked Out</span>
+                    <span className="text-[13px] font-semibold text-[#F8FAFC] tabular-nums">
+                      {summary.checkedOut}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                    <span className="text-[12px] text-[#64748B]">Active Now</span>
+                    <span className="text-[13px] font-semibold text-[#F8FAFC] tabular-nums">
+                      {summary.checkedIn - summary.checkedOut}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                    <span className="text-[12px] text-[#64748B]">Peak Hour</span>
+                    <span className="text-[13px] font-semibold text-[#F8FAFC] tabular-nums">
+                      {summary.peakHour}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                    <span className="text-[12px] text-[#64748B]">Avg Duration</span>
+                    <span className="text-[13px] font-semibold text-[#F8FAFC] tabular-nums">
+                      {summary.avgDuration}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="mt-6">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                  Recent Activity
+                </p>
+                <div className="space-y-2">
+                  {recentActivity.length === 0 ? (
+                    <p className="text-[12px] text-[#64748B] text-center py-4">No recent activity</p>
+                  ) : (
+                    recentActivity.slice(0, 6).map((activity) => (
+                      <div key={activity.id} className="flex items-center gap-3 rounded-xl bg-[#0F172A]/50 px-4 py-2.5">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-500 text-[9px] font-bold text-white">
+                          {activity.memberAvatar}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-medium text-[#94A3B8] truncate">
+                            {activity.memberName}
+                          </p>
+                          <p className="text-[10px] text-[#64748B]">
+                            {activity.action === "checked_in" ? "Checked in" : "Checked out"} at {activity.time}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* View Full Report */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#1E293B] px-4 py-3 text-[12px] font-medium text-[#64748B] transition-all hover:border-[#3B82F6]/50 hover:text-[#3B82F6] shadow-sm"
+                type="button"
+              >
+                View Full Report
+                <ArrowRight className="h-3.5 w-3.5" />
+              </motion.button>
+            </FadeUp>
+          </div>
+        </div>
+      {/* Toast */}
+      <Toast
+        key={toastKey}
+        message={toastMessage}
+        visible={toastVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }

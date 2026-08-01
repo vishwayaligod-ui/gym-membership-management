@@ -14,13 +14,13 @@ type FormFieldProps = {
 export function FormField({ label, name, required = false, children, error, hint }: FormFieldProps) {
   return (
     <div className="space-y-2">
-      <label htmlFor={name} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={name} className="block text-sm font-medium text-slate-300">
         {label}
-        {required ? <span className="ml-1 text-blue-600">*</span> : null}
+        {required ? <span className="ml-1 text-emerald-400">*</span> : null}
       </label>
       {children}
       {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
     </div>
   );
 }

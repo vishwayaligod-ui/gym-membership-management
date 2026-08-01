@@ -110,9 +110,104 @@ model Gym {
   dietPlans       DietPlan[]
   ptPackages      PTPackage[]
   ptSessions      PTSession[]
+  settings        GymSettings?
+  settingsBackups GymSettingsBackup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model GymSettings {
+  id String @id @default(uuid())
+
+  gymId String @unique
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  gymName                   String
+  ownerName                 String
+  email                     String
+  phone                     String
+  alternatePhone            String?
+  address                   String
+  city                      String
+  state                     String
+  country                   String
+  pincode                   String
+  gstNumber                 String?
+  website                   String?
+  googleBusinessProfileUrl  String?
+  businessHours             String
+  gymLogo                   String?
+
+  primaryAccentColor String @default("#2563EB")
+  secondaryColor     String @default("#0F172A")
+  brandingLogo       String?
+  favicon            String?
+
+  defaultMembershipDurationDays Int     @default(90)
+  defaultFreezeDays             Int     @default(7)
+  allowMultipleActiveMemberships Boolean @default(false)
+  autoActivateMembership         Boolean @default(true)
+  membershipExpiryReminder       Boolean @default(true)
+  reminderBeforeDays             Int     @default(7)
+  gracePeriodAfterExpiryDays     Int     @default(3)
+
+  currency                  String  @default("INR")
+  currencySymbol            String  @default("₹")
+  taxPercentage             Decimal @default(0) @db.Decimal(5, 2)
+  lateFee                   Decimal @default(0) @db.Decimal(10, 2)
+  receiptPrefix             String  @default("RCPT")
+  invoicePrefix             String  @default("INV")
+  autoGenerateReceiptNumber Boolean @default(true)
+
+  allowMultipleCheckIns      Boolean @default(false)
+  lateArrivalThresholdMins   Int     @default(15)
+  workingHoursStart          String  @default("06:00")
+  workingHoursEnd            String  @default("22:00")
+  checkInWindowStart         String  @default("05:30")
+  checkInWindowEnd           String  @default("23:00")
+  attendanceAutoCloseTime    String  @default("23:59")
+
+  whatsappNotifications  Boolean @default(false)
+  smsNotifications       Boolean @default(false)
+  emailNotifications     Boolean @default(true)
+  renewalReminder        Boolean @default(true)
+  paymentReminder        Boolean @default(true)
+  birthdayWishes         Boolean @default(false)
+  attendanceReminder     Boolean @default(false)
+
+  defaultDashboard String @default("overview")
+  defaultLanguage  String @default("en")
+  dateFormat       String @default("DD/MM/YYYY")
+  timeFormat       String @default("24h")
+  timezone         String @default("Asia/Kolkata")
+
+  requirePasswordChange  Boolean @default(false)
+  sessionTimeoutMinutes  Int     @default(30)
+  twoFactorAuthentication Boolean @default(false)
+  loginHistoryEnabled     Boolean @default(true)
+
+  lastBackupAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+}
+
+model GymSettingsBackup {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  label    String?
+  snapshot Json
+
+  createdAt DateTime @default(now())
+
+  @@index([gymId])
+  @@index([createdAt])
 }
 
 model Branch {

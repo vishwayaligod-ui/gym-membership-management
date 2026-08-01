@@ -2,16 +2,10 @@
 
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock3, MoreHorizontal, Phone, ShieldCheck, UserRound } from "lucide-react";
-import type { AttendanceMember, AttendanceStatus } from "../attendance/mockAttendance";
-
-const badgeStyles: Record<AttendanceStatus, string> = {
-  Present: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  "Checked Out": "bg-blue-50 text-blue-700 ring-blue-200",
-  Pending: "bg-amber-50 text-amber-700 ring-amber-200",
-};
+import type { AttendanceRecord } from "../attendance/types";
 
 type AttendanceCardProps = {
-  member: AttendanceMember;
+  member: AttendanceRecord;
 };
 
 export function AttendanceCard({ member }: AttendanceCardProps) {
@@ -40,9 +34,6 @@ export function AttendanceCard({ member }: AttendanceCardProps) {
             </div>
           </div>
         </div>
-        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${badgeStyles[member.status]}`}>
-          {member.status}
-        </span>
       </div>
 
       <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
@@ -62,11 +53,11 @@ export function AttendanceCard({ member }: AttendanceCardProps) {
         </div>
         <div className="rounded-2xl bg-slate-50 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Check-in</p>
-          <p className="mt-1 font-medium text-slate-700">{member.checkInTime}</p>
+          <p className="mt-1 font-medium text-slate-700">{member.checkIn}</p>
         </div>
         <div className="rounded-2xl bg-slate-50 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Check-out</p>
-          <p className="mt-1 font-medium text-slate-700">{member.checkOutTime ?? "—"}</p>
+          <p className="mt-1 font-medium text-slate-700">{member.checkOut}</p>
         </div>
       </div>
 

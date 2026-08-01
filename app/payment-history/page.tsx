@@ -1,260 +1,517 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { Search, TrendingUp, Clock, CheckCircle2, AlertCircle, DollarSign } from "lucide-react";
-import { AppHeader } from "../components/AppHeader";
-import { BottomNavigation } from "../components/BottomNavigation";
-import { PageContainer } from "../components/PageContainer";
-import { PaymentCard } from "../components/payments/PaymentCard";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
-  mockPayments,
-  paymentSummaryCards,
+  Search,
+  DollarSign,
+  TrendingUp,
+  Calendar,
+  Clock,
+  Eye,
+  Loader2,
+  ChevronDown,
+  Banknote,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { Toaster, toast } from "sonner";
+import { Pagination } from "../components/v4/Pagination";
+import { FadeUp } from "../components/v4/MotionDiv";
+import {
+  type Payment,
   type PaymentStatus,
-} from "./mockPayments";
-
-type FilterKey = "all" | PaymentStatus;
-
-const filterChips: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "paid", label: "Paid" },
-  { key: "pending", label: "Pending" },
-  { key: "failed", label: "Failed" },
-];
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.3 },
-  },
-};
+  type PaymentMode,
+  type PaymentsSummary,
+  paymentStatusColors,
+  paymentModeLabels,
+  paymentModeColors,
+  paymentStatusFilters,
+  paymentMethodFilters,
+} from "./types";
 
 export default function PaymentHistoryPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "All">("All");
+  const [methodFilter, setMethodFilter] = useState<PaymentMode | "All">("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [summary, setSummary] = useState<PaymentsSummary>({
+    todayRevenue: 0,
+    weeklyRevenue: 0,
+    monthlyRevenue: 0,
+    pendingCount: 0,
+    pendingAmount: 0,
+  });
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
 
-  const filteredPayments = useMemo(() => {
-    let result = mockPayments;
+  const fetchPayments = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("search", searchQuery);
+      if (statusFilter !== "All") params.set("status", statusFilter);
+      if (methodFilter !== "All") params.set("method", methodFilter);
+      params.set("page", String(currentPage));
+      params.set("limit", String(rowsPerPage));
 
-    if (activeFilter !== "all") {
-      result = result.filter((p) => p.status === activeFilter);
+      const response = await fetch(`/api/payments?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch payments");
+      const data = await response.json();
+      setPayments(data.payments);
+      setSummary(data.summary);
+      setTotalPages(data.pagination.totalPages);
+      setTotalItems(data.pagination.total);
+    } catch (error) {
+      console.error("Failed to fetch payments:", error);
+      toast.error("Failed to load payments");
+    } finally {
+      setIsLoading(false);
     }
+  }, [searchQuery, statusFilter, methodFilter, currentPage, rowsPerPage]);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.memberName.toLowerCase().includes(q) ||
-          p.plan.toLowerCase().includes(q) ||
-          p.method.toLowerCase().includes(q)
-      );
-    }
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
-    return result;
-  }, [searchQuery, activeFilter]);
+  // Reset to page 1 when filters change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
-  // Calculate collections
-  const todaysPayments = mockPayments.filter(p => p.date === "Jul 17, 2026" && p.status === "paid");
-  const todaysCollection = todaysPayments.reduce((sum, p) => sum + p.amount, 0);
-  
-  const pendingPayments = mockPayments.filter(p => p.status === "pending");
-  const pendingAmount = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
-  
-  const thisMonthPaid = mockPayments.filter(p => p.status === "paid");
-  const thisMonthCollection = thisMonthPaid.reduce((sum, p) => sum + p.amount, 0);
+  const handleStatusFilterChange = (value: PaymentStatus | "All") => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleMethodFilterChange = (value: PaymentMode | "All") => {
+    setMethodFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleRowsPerPageChange = (rows: number) => {
+    setRowsPerPage(rows);
+    setCurrentPage(1);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `₹${amount.toLocaleString("en-IN")}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const hasActiveFilters = statusFilter !== "All" || methodFilter !== "All" || searchQuery !== "";
+
+  const resetFilters = () => {
+    setStatusFilter("All");
+    setMethodFilter("All");
+    setSearchQuery("");
+    setCurrentPage(1);
+  };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">
-      <AppHeader title="Payments" />
+    <div className="space-y-6">
+      <Toaster position="top-right" richColors closeButton />
 
-      <PageContainer>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-6 py-4"
-        >
-          {/* -------- Header -------- */}
-          <div>
-            <p className="text-2xl font-semibold tracking-tight text-slate-950">
-              Payments Dashboard
+      {/* ═══════════════════════════════════════════
+         PAGE HEADER
+         ═══════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
+            Payment History
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Track all payments across the gym.
+          </p>
+        </div>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════
+         TOP SUMMARY CARDS
+         ═══════════════════════════════════════════ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FadeUp delay={0.05}>
+          <motion.div
+            whileHover={{ y: -3, transition: { duration: 0.15 } }}
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-900/30">
+                <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
+              </div>
+              <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
+                Today's Revenue
+              </span>
+            </div>
+            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+              {isLoading ? "..." : formatCurrency(summary.todayRevenue)}
             </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Track revenue, collections, and payment status
+            <p className="mt-0.5 text-[10px] text-slate-500">Payments received today</p>
+          </motion.div>
+        </FadeUp>
+
+        <FadeUp delay={0.1}>
+          <motion.div
+            whileHover={{ y: -3, transition: { duration: 0.15 } }}
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-900/30">
+                <TrendingUp className="h-3.5 w-3.5 text-blue-400" />
+              </div>
+              <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
+                This Week
+              </span>
+            </div>
+            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+              {isLoading ? "..." : formatCurrency(summary.weeklyRevenue)}
             </p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Weekly revenue</p>
+          </motion.div>
+        </FadeUp>
+
+        <FadeUp delay={0.15}>
+          <motion.div
+            whileHover={{ y: -3, transition: { duration: 0.15 } }}
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-900/30">
+                <Calendar className="h-3.5 w-3.5 text-purple-400" />
+              </div>
+              <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
+                This Month
+              </span>
+            </div>
+            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+              {isLoading ? "..." : formatCurrency(summary.monthlyRevenue)}
+            </p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Monthly revenue</p>
+          </motion.div>
+        </FadeUp>
+
+        <FadeUp delay={0.2}>
+          <motion.div
+            whileHover={{ y: -3, transition: { duration: 0.15 } }}
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-900/30">
+                <Clock className="h-3.5 w-3.5 text-amber-400" />
+              </div>
+              <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
+                Pending
+              </span>
+            </div>
+            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+              {isLoading ? "..." : `${summary.pendingCount} (${formatCurrency(summary.pendingAmount)})`}
+            </p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Pending payments</p>
+          </motion.div>
+        </FadeUp>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         SEARCH & FILTER BAR
+         ═══════════════════════════════════════════ */}
+      <FadeUp delay={0.1}>
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+          {/* Search Row */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search by member name, phone, or transaction ID..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 py-3 pl-10 pr-4 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-blue-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-blue-500/30"
+              />
+            </div>
           </div>
 
-          {/* -------- Revenue Summary Cards -------- */}
-          <motion.section
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-600">Revenue Overview</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {paymentSummaryCards.map((card, i) => (
-                <motion.article
-                  key={card.label}
-                  variants={itemVariants}
-                  className={`rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]`}
-                >
-                  <p className="text-sm font-medium text-slate-500">{card.label}</p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                    {card.value}
-                  </p>
-                  <p className="mt-2 text-xs font-medium text-slate-600">{card.change}</p>
-                </motion.article>
-              ))}
+          {/* Filter Chips */}
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-700/40 pt-4">
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-medium text-slate-500">Status:</label>
+              <div className="flex flex-wrap gap-1.5">
+                {paymentStatusFilters.map((f) => (
+                  <motion.button
+                    key={f.value}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => handleStatusFilterChange(f.value)}
+                    className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                      statusFilter === f.value
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                        : "border border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    }`}
+                    type="button"
+                  >
+                    {f.label}
+                  </motion.button>
+                ))}
+              </div>
             </div>
-          </motion.section>
 
-          {/* -------- Collections Cards -------- */}
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.15 }}
-          >
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-600">Collections</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {/* Today's Collection */}
-              <div className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Today's Collection</p>
-                    <p className="mt-2 text-2xl font-semibold text-emerald-700">₹{todaysCollection.toLocaleString()}</p>
-                  </div>
-                  <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-600">
-                    <DollarSign className="h-5 w-5" />
-                  </div>
+            {/* Method Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-medium text-slate-500">Method:</label>
+              <div className="flex flex-wrap gap-1.5">
+                {paymentMethodFilters.map((f) => (
+                  <motion.button
+                    key={f.value}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => handleMethodFilterChange(f.value)}
+                    className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                      methodFilter === f.value
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                        : "border border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    }`}
+                    type="button"
+                  >
+                    {f.label}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reset */}
+            {hasActiveFilters && (
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/20 px-3 py-1.5 text-[11px] font-semibold text-red-400 transition-all hover:bg-red-950/30"
+                type="button"
+              >
+                Reset Filters
+              </motion.button>
+            )}
+          </div>
+        </div>
+      </FadeUp>
+
+      {/* ═══════════════════════════════════════════
+         MAIN CONTENT: TABLE
+         ═══════════════════════════════════════════ */}
+      <div className="flex-1 min-w-0 space-y-4">
+        {isLoading ? (
+          <FadeUp delay={0.15}>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+              <p className="mt-4 text-base font-semibold text-slate-300">Loading payments...</p>
+            </div>
+          </FadeUp>
+        ) : payments.length === 0 ? (
+          <FadeUp delay={0.15}>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-700/40">
+                <Banknote className="h-6 w-6 text-slate-500" />
+              </div>
+              <p className="mt-4 text-base font-semibold text-slate-300">No Payments Found</p>
+              <p className="mt-1.5 text-sm text-slate-500 max-w-sm">
+                {searchQuery || hasActiveFilters
+                  ? "Try adjusting your search terms or filters to find what you're looking for."
+                  : "No payments have been recorded yet."}
+              </p>
+            </div>
+          </FadeUp>
+        ) : (
+          <>
+            <FadeUp delay={0.15}>
+              <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+                {/* Table Header */}
+                <div className="hidden md:grid md:grid-cols-[56px_180px_120px_110px_110px_120px_140px_120px_60px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                  <div />
+                  <div>Member</div>
+                  <div>Plan</div>
+                  <div>Amount</div>
+                  <div>Method</div>
+                  <div>Status</div>
+                  <div>Transaction ID</div>
+                  <div>Date</div>
+                  <div />
                 </div>
-                <p className="mt-2 text-xs text-slate-600">{todaysPayments.length} transactions</p>
-              </div>
 
-              {/* This Month Collection */}
-              <div className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">This Month</p>
-                    <p className="mt-2 text-2xl font-semibold text-blue-700">₹{thisMonthCollection.toLocaleString()}</p>
-                  </div>
-                  <div className="rounded-2xl bg-blue-100 p-3 text-blue-600">
-                    <TrendingUp className="h-5 w-5" />
-                  </div>
+                {/* Table Rows */}
+                <div className="divide-y divide-slate-700/40">
+                  {payments.map((payment, idx) => {
+                    const statusColors = paymentStatusColors[payment.paymentStatus];
+                    const modeColor = paymentModeColors[payment.paymentMode];
+
+                    return (
+                      <motion.div
+                        key={payment.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: idx * 0.03 }}
+                        onMouseEnter={() => setHoveredRow(payment.id)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        onClick={() => router.push(`/payment-history/${payment.id}`)}
+                        className={`grid grid-cols-1 md:grid-cols-[56px_180px_120px_110px_110px_120px_140px_120px_60px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
+                          hoveredRow === payment.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
+                        }`}
+                      >
+                        {/* Avatar */}
+                        <div className="hidden md:flex items-center">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[11px] font-bold text-white shadow-sm shadow-blue-900/30">
+                            {payment.avatar}
+                          </div>
+                        </div>
+
+                        {/* Mobile Row */}
+                        <div className="flex items-center gap-3 md:hidden">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[11px] font-bold text-white shadow-sm shadow-blue-900/30">
+                            {payment.avatar}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-200 truncate">{payment.memberName}</p>
+                              <span className={`inline-flex items-center gap-1 rounded-full ${statusColors.bg} px-2 py-0.5 text-[10px] font-bold ${statusColors.text} whitespace-nowrap`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
+                                {payment.paymentStatus}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{payment.memberPhone}</p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${modeColor}`}>
+                                {paymentModeLabels[payment.paymentMode]}
+                              </span>
+                              <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                                {formatCurrency(payment.amount)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop: Member column */}
+                        <div className="hidden md:flex items-center min-w-0">
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-slate-200 truncate">{payment.memberName}</p>
+                            <p className="text-[11px] text-slate-500 truncate">{payment.memberPhone}</p>
+                          </div>
+                        </div>
+
+                        {/* Desktop: Plan */}
+                        <div className="hidden md:flex items-center">
+                          <span className="text-[12px] text-slate-400 whitespace-nowrap">{payment.plan}</span>
+                        </div>
+
+                        {/* Desktop: Amount */}
+                        <div className="hidden md:flex items-center">
+                          <span className="text-[13px] font-semibold text-slate-200 whitespace-nowrap">
+                            {formatCurrency(payment.amount)}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Payment Mode */}
+                        <div className="hidden md:flex items-center">
+                          <span className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${modeColor}`}>
+                            {paymentModeLabels[payment.paymentMode]}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Payment Status */}
+                        <div className="hidden md:flex items-center">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full ${statusColors.bg} px-[10px] py-1 text-[11px] font-bold ${statusColors.text} whitespace-nowrap`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
+                            {payment.paymentStatus}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Transaction ID */}
+                        <div className="hidden md:flex items-center">
+                          <span className="text-[12px] text-slate-400 truncate max-w-[130px]" title={payment.transactionId || ""}>
+                            {payment.transactionId || "—"}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Date */}
+                        <div className="hidden md:flex items-center">
+                          <span className="text-[12px] text-slate-400 whitespace-nowrap" title={formatDateTime(payment.paymentDate)}>
+                            {formatDate(payment.paymentDate)}
+                          </span>
+                        </div>
+
+                        {/* Desktop: Actions */}
+                        <div className="hidden md:flex items-center gap-1">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/payment-history/${payment.id}`);
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-all duration-200 ease-out hover:bg-blue-900/30 hover:text-blue-400"
+                            title="View Details"
+                            type="button"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </motion.button>
+                        </div>
+
+                        {/* Chevron for mobile */}
+                        <div className="hidden md:flex items-center justify-end">
+                          <ChevronDown className={`h-3.5 w-3.5 text-slate-600 transition-transform duration-200 ${
+                            hoveredRow === payment.id ? "rotate-[-90deg]" : ""
+                          }`} />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
-                <p className="mt-2 text-xs text-slate-600">{thisMonthPaid.length} paid transactions</p>
               </div>
+            </FadeUp>
 
-              {/* Pending Payments */}
-              <div className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Pending Payments</p>
-                    <p className="mt-2 text-2xl font-semibold text-amber-700">₹{pendingAmount.toLocaleString()}</p>
-                  </div>
-                  <div className="rounded-2xl bg-amber-100 p-3 text-amber-600">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-slate-600">{pendingPayments.length} pending</p>
-              </div>
-            </div>
-          </motion.section>
-
-          {/* -------- Search Bar -------- */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            className="relative"
-          >
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, plan, or payment method..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder-slate-400 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-          </motion.div>
-
-          {/* -------- Filter Chips -------- */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 }}
-            className="flex flex-wrap items-center gap-2"
-          >
-            {filterChips.map((chip) => {
-              const active = chip.key === activeFilter;
-              return (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={() => setActiveFilter(chip.key)}
-                  className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                    active
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
-          </motion.div>
-
-          {/* -------- Recent Payment List -------- */}
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">Recent Payments</h3>
-                <p className="mt-0.5 text-sm text-slate-500">{filteredPayments.length} transaction(s)</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {filteredPayments.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center justify-center rounded-[1.6rem] border border-slate-200 bg-white p-8 text-center shadow-[0_10px_35px_rgba(15,23,42,0.06)]"
-                >
-                  <AlertCircle className="h-10 w-10 text-slate-300" />
-                  <p className="mt-3 text-sm font-semibold text-slate-900">
-                    No payments found
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Try adjusting your search or filter.
-                  </p>
-                </motion.div>
-              ) : (
-                filteredPayments.map((payment, i) => (
-                  <PaymentCard key={payment.id} payment={payment} index={i} />
-                ))
-              )}
-            </div>
-          </motion.section>
-        </motion.div>
-      </PageContainer>
-
-      <BottomNavigation />
+            <FadeUp delay={0.2}>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                rowsPerPage={rowsPerPage}
+                onPageChange={handlePageChange}
+                onRowsPerPageChange={handleRowsPerPageChange}
+              />
+            </FadeUp>
+          </>
+        )}
+      </div>
     </div>
   );
 }

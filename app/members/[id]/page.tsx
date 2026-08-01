@@ -1,315 +1,491 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, DollarSign, Phone, Mail, Edit2, MessageSquare, LogOut, Zap } from "lucide-react";
-import { useState } from "react";
-import { PageContainer } from "@/app/components/PageContainer";
-import { AppHeader } from "@/app/components/AppHeader";
-import { AttendanceSummaryCard } from "@/app/components/AttendanceSummaryCard";
-import { mockMembers } from "@/app/members/mockMembers";
-import { mockPayments } from "@/app/payment-history/mockPayments";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Hash,
+  IndianRupee,
+  Loader2,
+  Mail,
+  Phone,
+  Tag,
+  UserRound,
+  Zap,
+} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Toaster, toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { getMemberStatus } from "@/app/lib/member-status";
 
-const statusStyles = {
-  Active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  Expiring: "bg-amber-50 text-amber-700 ring-amber-200",
-  Expired: "bg-rose-50 text-rose-700 ring-rose-200",
+type MemberData = {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  phone: string;
+  email: string | null;
+  gender: string;
+  dateOfBirth: string | null;
+  address: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
+  joiningDate: string;
+  status: string;
+  notes: string | null;
+  memberships: Array<{
+    id: string;
+    planId: string;
+    startDate: string;
+    endDate: string;
+    amount: number;
+    finalAmount: number;
+    status: string;
+    plan: {
+      id: string;
+      name: string;
+      durationInDays: number;
+      price: number;
+      joiningFee: number;
+    };
+  }>;
+  payments: Array<{
+    id: string;
+    amount: number;
+    paymentMode: string;
+    paymentStatus: string;
+    paymentDate: string;
+    remarks: string | null;
+  }>;
 };
 
-export default function MemberDetailsPage({ params }: { params: { id: string } }) {
-  const [isLoading] = useState(false);
-  
-  // Get member data from mock data
-  const member = mockMembers.find(m => m.id === parseInt(params.id));
-  
-  // Get recent payment for this member
-  const recentPayment = mockPayments.find(p => p.memberName === member?.name);
+export default function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [member, setMember] = useState<MemberData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!member) {
+  useEffect(() => {
+    async function fetchMember() {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/members/${id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError("Member not found");
+          } else {
+            throw new Error("Failed to fetch member");
+          }
+          return;
+        }
+        const data = await response.json();
+        setMember(data.member);
+      } catch (error) {
+        console.error("Failed to fetch member:", error);
+        setError("Failed to load member data");
+        toast.error("Failed to load member data");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchMember();
+  }, [id]);
+
+  if (isLoading) {
     return (
-      <div>
-        <AppHeader title="Member Details" />
-        <PageContainer>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-center py-32"
-          >
-            <p className="text-slate-600">Member not found</p>
-          </motion.div>
-        </PageContainer>
+      <div className="space-y-5">
+        <div className="flex min-h-[40vh] flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 px-4 py-8 shadow-[0_12px_36px_rgba(2,6,23,0.28)]">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+          <p className="mt-3 text-sm font-medium text-slate-300">Loading member data...</p>
+        </div>
       </div>
     );
   }
 
-  const planColors: Record<string, { gradient: string; icon: string }> = {
-    Classic: { gradient: "from-slate-400 to-slate-500", icon: "⚡" },
-    Premium: { gradient: "from-amber-400 to-orange-500", icon: "✨" },
-    Platinum: { gradient: "from-blue-400 to-indigo-500", icon: "👑" },
-  };
+  if (error || !member) {
+    return (
+      <div className="space-y-5">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex min-h-[40vh] flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 px-4 py-8 text-center shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+        >
+          <p className="text-sm text-slate-400">{error || "Member not found"}</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:border-slate-600 hover:bg-slate-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Go Back
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
-  const planConfig = planColors[member.plan] || planColors.Classic;
+  const memberName = `${member.firstName} ${member.lastName || ""}`.trim();
+  const initials = `${member.firstName.charAt(0)}${member.lastName?.charAt(0) || ""}`;
+  const latestMembership = member.memberships?.[0];
+  const recentPayment = member.payments?.[0];
 
-  // Mock attendance data for this member
-  const attendanceData = {
-    thisMonth: "12",
-    thisWeek: "3",
-    lastVisit: "Today, 8:30 AM",
-    averageDaily: "2.4 hours",
-  };
+  const displayStatus = getMemberStatus(
+    latestMembership?.endDate || null,
+    latestMembership?.status
+  );
 
-  // Mock membership data
-  const membershipData = {
-    daysRemaining: Math.floor(Math.random() * 200) + 1,
-    totalSpent: "₹" + (Math.random() > 0.5 ? "59,988" : "34,992"),
-    renewalDate: member.expiresOn,
-  };
+  const daysRemaining = latestMembership
+    ? Math.max(
+        0,
+        Math.floor(
+          (new Date(latestMembership.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+        )
+      )
+    : 0;
+
+  const totalSpent = member.payments?.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0) || 0;
+  const planName = latestMembership?.plan?.name || "N/A";
+  const planPrice = latestMembership?.plan?.price || 0;
+  const joinedOn = new Date(member.joiningDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const expiresOn = latestMembership
+    ? new Date(latestMembership.endDate).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "N/A";
+
+  const statusPillClass =
+    displayStatus === "Active"
+      ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/40"
+      : displayStatus === "Expiring"
+      ? "bg-amber-900/30 text-amber-400 border-amber-900/40"
+      : "bg-rose-900/30 text-rose-400 border-rose-900/40";
+
+  const daysPillClass =
+    daysRemaining > 60
+      ? "bg-emerald-900/30 text-emerald-400 border-emerald-900/40"
+      : daysRemaining > 30
+      ? "bg-amber-900/30 text-amber-400 border-amber-900/40"
+      : "bg-rose-900/30 text-rose-400 border-rose-900/40";
 
   return (
     <>
-      <AppHeader title={member.name} />
-      <PageContainer>
+      <Toaster position="top-right" richColors closeButton />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ staggerChildren: 0.06, delayChildren: 0.05 }}
+        className="space-y-5"
+      >
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ staggerChildren: 0.08, delayChildren: 0.1 }}
-          className="flex flex-col gap-6 py-6"
+          transition={{ staggerChildren: 0.06, delayChildren: 0.05 }}
+          className="space-y-3 pt-0 pb-1"
         >
-          {/* Hero Profile Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
           >
-            <article className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-              {/* Header Background */}
-              <div className={`h-24 bg-gradient-to-r ${planConfig.gradient}`} />
-
-              {/* Content */}
-              <div className="px-6 pb-6">
-                {/* Avatar & Info */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="flex items-end gap-4">
-                    <div className="-mt-14 flex h-28 w-28 items-center justify-center rounded-[1.4rem] border-4 border-white bg-gradient-to-br from-blue-600 to-indigo-500 text-4xl font-bold text-white shadow-lg shadow-blue-600/20">
-                      {member.avatar}
-                    </div>
-                    <div className="pb-2">
-                      <h1 className="text-2xl font-bold text-slate-900">{member.name}</h1>
-                      <p className="text-sm text-slate-600">{member.phone}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${statusStyles[member.status]}`}>
-                      {member.status}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                      {planConfig.icon} {member.plan}
+            <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.back()}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-slate-100"
+                  aria-label="Go back"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Member Details</h1>
+                    <span className="rounded-full border border-slate-800 bg-slate-950 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                      #{member.id.slice(0, 8).toUpperCase()}
                     </span>
                   </div>
+                  <p className="mt-1 text-xs text-slate-500 sm:text-sm">View complete member information.</p>
                 </div>
+              </div>
 
-                {/* Details Grid */}
-                <div className="mt-6 grid gap-4 border-t border-slate-200 pt-6 sm:grid-cols-2">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Joined On</p>
-                    <p className="mt-1.5 text-sm font-semibold text-slate-900">{member.joinedOn}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Expires On</p>
-                    <p className="mt-1.5 text-sm font-semibold text-slate-900">{member.expiresOn}</p>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusPillClass}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${displayStatus === "Active" ? "bg-emerald-400" : displayStatus === "Expiring" ? "bg-amber-400" : "bg-rose-400"}`} />
+                  {displayStatus}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                  <IndianRupee className="h-3.5 w-3.5 text-slate-400" />
+                  ₹{totalSpent.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+          >
+            <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white ring-1 ring-slate-800">
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold tracking-tight text-slate-100 sm:text-xl">{memberName}</h2>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+                      <Tag className="h-3.5 w-3.5" />
+                      {planName}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs font-medium text-slate-300">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" />
+                      {member.phone}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs font-medium text-slate-300">
+                      <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                      {expiresOn}
+                    </span>
                   </div>
                 </div>
               </div>
-            </article>
-          </motion.div>
 
-          {/* Membership Summary */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <article className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Zap className="h-4.5 w-4.5 text-blue-600" />
-                Membership Summary
-              </h2>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Days Remaining</p>
-                    <p className="mt-0.5 text-lg font-semibold text-slate-900">{membershipData.daysRemaining}</p>
-                  </div>
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">Plan Price</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-100">₹{Number(planPrice).toLocaleString("en-IN")}</p>
                 </div>
-
-                <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                    <DollarSign className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Total Spent</p>
-                    <p className="mt-0.5 text-lg font-semibold text-slate-900">{membershipData.totalSpent}</p>
-                  </div>
+                <div className={`rounded-xl border px-3 py-1.5 ${daysPillClass}`}>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-inherit opacity-80">Days Remaining</p>
+                  <p className="mt-0.5 text-sm font-semibold text-inherit">{daysRemaining} Days</p>
                 </div>
-
-                <div className="flex items-center gap-3 rounded-xl bg-amber-50 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Renewal</p>
-                    <p className="mt-0.5 text-lg font-semibold text-slate-900">{member.expiresOn}</p>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </motion.div>
-
-          {/* Attendance Summary */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div>
-              <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Clock className="h-4.5 w-4.5 text-blue-600" />
-                Attendance Summary
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <AttendanceSummaryCard
-                  label="This Month"
-                  value={attendanceData.thisMonth}
-                  tone="bg-blue-100 text-blue-600"
-                  icon={Clock}
-                />
-                <AttendanceSummaryCard
-                  label="This Week"
-                  value={attendanceData.thisWeek}
-                  tone="bg-emerald-100 text-emerald-600"
-                  icon={Clock}
-                />
-                <AttendanceSummaryCard
-                  label="Last Visit"
-                  value="Today"
-                  tone="bg-purple-100 text-purple-600"
-                  icon={Clock}
-                />
-                <AttendanceSummaryCard
-                  label="Average Daily"
-                  value="2.4h"
-                  tone="bg-orange-100 text-orange-600"
-                  icon={Clock}
-                />
               </div>
             </div>
           </motion.div>
 
-          {/* Payment Summary */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <article className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <DollarSign className="h-4.5 w-4.5 text-blue-600" />
-                Payment Summary
-              </h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <UserRound className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-100">Member Information</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Name</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{memberName}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Phone</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{member.phone}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Email</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-slate-100">{member.email || "N/A"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Gender</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{member.gender}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Member ID</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">#{member.id.slice(0, 8).toUpperCase()}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Join Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{joinedOn}</p>
+                </div>
+              </div>
+            </motion.section>
 
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut", delay: 0.03 }}
+              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-100">Membership Details</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{planName}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Membership ID</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">#{latestMembership?.id.slice(0, 8).toUpperCase() || "N/A"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan ID</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">#{latestMembership?.planId.slice(0, 8).toUpperCase() || "N/A"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Duration</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{latestMembership?.plan.durationInDays || 0} days</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Start Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {latestMembership?.startDate
+                      ? new Date(latestMembership.startDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "N/A"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">End Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{expiresOn}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan Price</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(planPrice).toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 sm:col-span-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Membership Status</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{displayStatus}</p>
+                </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut", delay: 0.06 }}
+              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-100">Payment Summary</h3>
+              </div>
               {recentPayment ? (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Last Payment</p>
-                      <p className="mt-1 text-2xl font-bold text-slate-900">₹{recentPayment.amount.toLocaleString()}</p>
-                    </div>
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${
-                      recentPayment.status === "paid"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : recentPayment.status === "pending"
-                        ? "bg-amber-50 text-amber-700 ring-amber-200"
-                        : "bg-rose-50 text-rose-700 ring-rose-200"
-                    }`}>
-                      {recentPayment.status.charAt(0).toUpperCase() + recentPayment.status.slice(1)}
-                    </span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Latest Payment</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">₹{recentPayment.amount.toLocaleString("en-IN")}</p>
                   </div>
-                  <div className="border-t border-slate-200 pt-3">
-                    <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Method</p>
-                        <p className="mt-1 font-medium text-slate-900">{recentPayment.method}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Date</p>
-                        <p className="mt-1 font-medium text-slate-900">{recentPayment.date}</p>
-                      </div>
-                    </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Status</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {recentPayment.paymentStatus.charAt(0) + recentPayment.paymentStatus.slice(1).toLowerCase()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Date</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {new Date(recentPayment.paymentDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Method</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {recentPayment.paymentMode === "CASH"
+                        ? "Cash"
+                        : recentPayment.paymentMode === "UPI"
+                        ? "UPI"
+                        : recentPayment.paymentMode === "CARD"
+                        ? "Card"
+                        : recentPayment.paymentMode === "BANK_TRANSFER"
+                        ? "Bank Transfer"
+                        : recentPayment.paymentMode}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Lifetime Amount Paid</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">₹{totalSpent.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Next Due Date</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">{expiresOn}</p>
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 text-sm text-slate-600">No payment records found</div>
+                <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-6">
+                  <p className="text-sm text-slate-400">No payment records found</p>
+                </div>
               )}
-            </article>
-          </motion.div>
+            </motion.section>
 
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div>
-              <h2 className="mb-4 text-base font-semibold text-slate-900">Quick Actions</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isLoading}
-                  className="flex items-center justify-center gap-2.5 rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
-                >
-                  <Edit2 className="h-4 w-4" />
-                  Edit Profile
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isLoading}
-                  className="flex items-center justify-center gap-2.5 rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-50"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Send Message
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isLoading}
-                  className="flex items-center justify-center gap-2.5 rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
-                >
-                  <DollarSign className="h-4 w-4" />
-                  Collect Payment
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isLoading}
-                  className="flex items-center justify-center gap-2.5 rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-700 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Suspend
-                </motion.button>
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut", delay: 0.09 }}
+              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-100">Membership Summary</h3>
               </div>
-            </div>
-          </motion.div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Days Remaining</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{daysRemaining} Days</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Membership Type</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{planName}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Membership Started</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{joinedOn}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Renewal Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{expiresOn}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Lifetime Amount Paid</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{totalSpent.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Trainer</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">Not assigned</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 sm:col-span-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan Price</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(planPrice).toLocaleString("en-IN")}</p>
+                </div>
+              </div>
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut", delay: 0.12 }}
+              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)] lg:col-span-2"
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <Zap className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-100">Notes</h3>
+              </div>
+              <p className="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-sm leading-6 text-slate-300">
+                {member.notes || "No notes"}
+              </p>
+            </motion.section>
+          </div>
         </motion.div>
-      </PageContainer>
+      </motion.div>
     </>
   );
 }

@@ -1,0 +1,20 @@
+# Gym Membership Management SaaS
+
+## Tech Stack
+- Next.js 16 App Router
+- TypeScript
+- Tailwind CSS v4
+- Prisma ORM
+- PostgreSQL (Neon)
+- Auth.js v5
+
+## Rules
+- Never use JavaScript.
+- Never redesign completed pages.
+- Reuse existing components.
+- Preserve business logic.
+- Mobile-first responsive.
+- Production-ready code only.
+- Ask before changing database schema.
+- Never delete files unless requested.
+- Never run npm run build unless requested.

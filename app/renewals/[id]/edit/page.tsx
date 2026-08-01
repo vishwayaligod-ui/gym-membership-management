@@ -2,17 +2,32 @@
 
 import { motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, ArrowLeft, FileText, Tag, DollarSign, Percent, AlertCircle, CreditCard } from "lucide-react";
+import { CalendarDays, ArrowLeft, FileText, Tag, DollarSign, Percent, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, use, useEffect } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { AppHeader } from "@/app/components/AppHeader";
 import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { FormField } from "@/app/components/FormField";
 import { PageContainer } from "@/app/components/PageContainer";
-import { mockRenewals } from "@/app/renewals/mockRenewals";
+
+interface EditRenewalData {
+  id: string;
+  name: string;
+  plan: string;
+  phone: string;
+  expiryDate: string;
+  fee: number;
+  avatar: string;
+  planId: string;
+  amount: number;
+  discount: number;
+  finalAmount: number;
+  startDate: string;
+  endDate: string;
+}
 
 const schema = z.object({
   memberName: z.string().min(1, "Member name is required"),
@@ -54,19 +69,6 @@ function addMonthsToDate(dateStr: string, months: number): string {
   return `${month} ${day}, ${year}`;
 }
 
-function convertDateToInputFormat(dateStr: string): string {
-  const months: Record<string, string> = {
-    Jan: "01", Feb: "02", Mar: "03", Apr: "04",
-    May: "05", Jun: "06", Jul: "07", Aug: "08",
-    Sep: "09", Oct: "10", Nov: "11", Dec: "12",
-  };
-  const parts = dateStr.split(" ");
-  const month = months[parts[0]];
-  const day = parts[1].replace(",", "").padStart(2, "0");
-  const year = parts[2];
-  return `${year}-${month}-${day}`;
-}
-
 function convertInputFormatToDate(inputDate: string): string {
   const months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const [year, month, day] = inputDate.split("-");
@@ -74,62 +76,72 @@ function convertInputFormatToDate(inputDate: string): string {
   return `${monthName} ${parseInt(day)}, ${year}`;
 }
 
-export default function EditRenewalPage({ params }: { params: { id: string } }) {
+export default function EditRenewalPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [renewal, setRenewal] = useState<EditRenewalData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const renewal = mockRenewals.find((r) => r.id === parseInt(params.id));
+  const { id } = use(params);
 
-  if (!renewal) {
-    return (
-      <div>
-        <AppHeader title="Edit Renewal" />
-        <PageContainer>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-32"
-          >
-            <AlertCircle className="h-12 w-12 text-slate-300" />
-            <p className="mt-4 text-lg font-semibold text-slate-900">Renewal not found</p>
-            <button
-              onClick={() => router.back()}
-              className="mt-4 flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Go Back
-            </button>
-          </motion.div>
-        </PageContainer>
-      </div>
-    );
-  }
+  useEffect(() => {
+    async function fetchRenewal() {
+      try {
+        const response = await fetch(`/api/renewals/${id}`);
+        if (!response.ok) throw new Error("Not found");
+        const data = await response.json();
+        setRenewal(data.renewal);
+      } catch (error) {
+        console.error("Failed to fetch renewal:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchRenewal();
+  }, [id]);
 
   // Determine duration based on plan and defaults
   const defaultDuration = "3 Months";
-  const defaultAmount = renewal.fee;
+  const defaultAmount = renewal?.fee || 0;
   const defaultDiscount = Math.floor(defaultAmount * 0.1);
   const paymentMethodsList = ["Cash", "UPI", "Card"];
-  const defaultPaymentMethod = paymentMethodsList[renewal.id % paymentMethodsList.length];
+  const defaultPaymentMethod = paymentMethodsList[0];
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
+    reset,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      memberName: renewal.name,
-      membershipPlan: renewal.plan,
+      memberName: "",
+      membershipPlan: "",
       duration: defaultDuration,
       startDate: new Date().toISOString().split("T")[0],
-      renewalAmount: defaultAmount.toString(),
-      discount: defaultDiscount.toString(),
+      renewalAmount: "",
+      discount: "",
       paymentMethod: defaultPaymentMethod,
-      notes: `Renewal of ${renewal.plan} membership for ${renewal.name}`,
+      notes: "",
     },
   });
+
+  // Reset form when renewal data loads
+  useEffect(() => {
+    if (renewal) {
+      reset({
+        memberName: renewal.name,
+        membershipPlan: renewal.plan,
+        duration: defaultDuration,
+        startDate: new Date().toISOString().split("T")[0],
+        renewalAmount: renewal.amount.toString(),
+        discount: renewal.discount.toString(),
+        paymentMethod: defaultPaymentMethod,
+        notes: `Renewal of ${renewal.plan} membership for ${renewal.name}`,
+      });
+    }
+  }, [renewal, reset, defaultDuration, defaultPaymentMethod]);
 
   const duration = watch("duration");
   const startDate = watch("startDate");
@@ -160,25 +172,34 @@ export default function EditRenewalPage({ params }: { params: { id: string } }) 
   const onSubmit = async (values: FormValues) => {
     setIsSaving(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      console.log("Renewal updated:", {
-        ...values,
-        renewalAmount: parseFloat(values.renewalAmount),
-        discount: values.discount ? parseFloat(values.discount) : 0,
-        finalAmount: finalAmount,
-        endDate: endDate,
+      const response = await fetch(`/api/renewals/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: renewal?.planId,
+          startDate: values.startDate,
+          endDate: endDate,
+          amount: parseFloat(values.renewalAmount),
+          discount: values.discount ? parseFloat(values.discount) : 0,
+          finalAmount: finalAmount,
+          paymentMethod: values.paymentMethod,
+          notes: values.notes || "",
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update renewal");
+      }
 
       toast.success("Renewal updated successfully!", {
-        description: `${renewal.name}'s renewal updated for ${duration}.`,
+        description: `${renewal?.name}'s renewal updated for ${duration}.`,
       });
 
-      router.push(`/renewals/${renewal.id}`);
+      router.push(`/renewals/${id}`);
     } catch (error) {
       toast.error("Failed to update renewal", {
-        description: "Please try again",
+        description: error instanceof Error ? error.message : "Please try again",
       });
     } finally {
       setIsSaving(false);
@@ -188,6 +209,44 @@ export default function EditRenewalPage({ params }: { params: { id: string } }) 
   const handleCancel = () => {
     router.back();
   };
+
+  if (isLoading) {
+    return (
+      <div>
+        <AppHeader title="Edit Renewal" />
+        <PageContainer>
+          <div className="flex items-center justify-center py-32">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
+        </PageContainer>
+      </div>
+    );
+  }
+
+  if (!renewal) {
+    return (
+      <div>
+        <AppHeader title="Edit Renewal" />
+        <PageContainer>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-32"
+          >
+            <AlertCircle className="h-12 w-12 text-slate-300" />
+            <p className="mt-4 text-lg font-semibold text-slate-900">Renewal not found</p>
+            <button
+              onClick={() => router.back()}
+              className="mt-4 flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Go Back
+            </button>
+          </motion.div>
+        </PageContainer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">

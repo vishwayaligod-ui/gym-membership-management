@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Download,
@@ -7,7 +8,7 @@ import {
   Share2,
   type LucideIcon,
 } from "lucide-react";
-import type { Payment } from "../../payment-history/mockPayments";
+import type { Payment } from "../../payment-history/types";
 
 type PaymentCardProps = {
   payment: Payment;
@@ -15,46 +16,66 @@ type PaymentCardProps = {
 };
 
 const statusConfig: Record<
-  Payment["status"],
-  { label: string; bg: string; text: string; ring: string }
+  Payment["paymentStatus"],
+  { label: string; bg: string; text: string; ring: string; dot: string }
 > = {
-  paid: {
+  PAID: {
     label: "Paid",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    ring: "ring-emerald-200",
+    bg: "bg-emerald-900/30",
+    text: "text-emerald-400",
+    ring: "ring-emerald-900/50",
+    dot: "bg-emerald-400",
   },
-  pending: {
+  PENDING: {
     label: "Pending",
-    bg: "bg-amber-50",
-    text: "text-amber-700",
-    ring: "ring-amber-200",
+    bg: "bg-amber-900/30",
+    text: "text-amber-400",
+    ring: "ring-amber-900/50",
+    dot: "bg-amber-400",
   },
-  failed: {
+  FAILED: {
     label: "Failed",
-    bg: "bg-rose-50",
-    text: "text-rose-700",
-    ring: "ring-rose-200",
+    bg: "bg-rose-900/30",
+    text: "text-rose-400",
+    ring: "ring-rose-900/50",
+    dot: "bg-rose-400",
+  },
+  PARTIAL: {
+    label: "Partial",
+    bg: "bg-amber-900/30",
+    text: "text-amber-400",
+    ring: "ring-amber-900/50",
+    dot: "bg-amber-400",
+  },
+  REFUNDED: {
+    label: "Refunded",
+    bg: "bg-purple-900/30",
+    text: "text-purple-400",
+    ring: "ring-purple-900/50",
+    dot: "bg-purple-400",
   },
 };
 
 const methodIcons: Record<string, string> = {
   UPI: "💳",
-  Cash: "💵",
-  "Credit Card": "💳",
-  "Net Banking": "🏦",
+  CASH: "💵",
+  CARD: "💳",
+  BANK_TRANSFER: "🏦",
+  CHEQUE: "💳",
 };
 
 type ActionButtonProps = {
   icon: LucideIcon;
   label: string;
+  onClick?: () => void;
 };
 
-function ActionButton({ icon: Icon, label }: ActionButtonProps) {
+function ActionButton({ icon: Icon, label, onClick }: ActionButtonProps) {
   return (
     <button
       type="button"
-      className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/50 px-3.5 py-2 text-[12px] font-semibold text-slate-400 shadow-sm transition-all duration-200 hover:border-blue-500/40 hover:bg-blue-900/20 hover:text-blue-400"
     >
       <Icon className="h-3.5 w-3.5" />
       <span className="hidden sm:inline">{label}</span>
@@ -63,57 +84,64 @@ function ActionButton({ icon: Icon, label }: ActionButtonProps) {
 }
 
 export function PaymentCard({ payment, index }: PaymentCardProps) {
-  const status = statusConfig[payment.status];
+  const router = useRouter();
+  const status = statusConfig[payment.paymentStatus];
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: index * 0.04, ease: "easeOut" }}
-      className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-5"
+      transition={{ duration: 0.3, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
+      className="rounded-xl border border-[#334155] bg-[#1E293B] shadow-sm transition-all duration-300 hover:border-slate-600/60 hover:bg-[#273449]"
     >
-      <div className="flex items-start justify-between gap-3">
-        {/* Left: avatar + info */}
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-sm font-semibold text-white shadow-md">
-            {payment.avatar}
+      {/* Top section: avatar + info + amount */}
+      <div className="p-5 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          {/* Left: avatar + info */}
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 text-sm font-semibold text-white shadow-md shadow-blue-600/15">
+              {payment.avatar}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold text-[#F8FAFC]">
+                {payment.memberName}
+              </p>
+              <p className="mt-0.5 text-[13px] text-[#64748B]">{payment.plan} Plan</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">
-              {payment.memberName}
+
+          {/* Right: amount + status */}
+          <div className="shrink-0 text-right">
+            <p className="text-xl font-bold tracking-tight text-[#F8FAFC]">
+              ₹{payment.amount.toLocaleString("en-US")}
             </p>
-            <p className="text-xs text-slate-500">{payment.plan} Plan</p>
+            <span
+              className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${status.bg} ${status.text} ${status.ring}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+              {status.label}
+            </span>
           </div>
         </div>
 
-        {/* Right: amount + status */}
-        <div className="shrink-0 text-right">
-          <p className="text-lg font-bold tracking-tight text-slate-900">
-            ₹{payment.amount.toLocaleString("en-US")}
-          </p>
-          <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${status.bg} ${status.text} ${status.ring}`}
-          >
-            {status.label}
+        {/* Middle: method + date */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#64748B]">
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs">{methodIcons[payment.paymentMode] ?? "💳"}</span>
+            {payment.paymentMode === "CASH" ? "Cash" : payment.paymentMode === "CARD" ? "Card" : payment.paymentMode === "UPI" ? "UPI" : payment.paymentMode === "BANK_TRANSFER" ? "Bank Transfer" : "Cheque"}
           </span>
+          <span className="text-slate-600">•</span>
+          <span>{payment.paymentDate}</span>
         </div>
-      </div>
-
-      {/* Middle: method + date */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-        <span className="flex items-center gap-1">
-          <span className="text-xs">{methodIcons[payment.method] ?? "💳"}</span>
-          {payment.method}
-        </span>
-        <span>•</span>
-        <span>{payment.date}</span>
       </div>
 
       {/* Actions */}
-      <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
-        <ActionButton icon={Eye} label="View" />
-        <ActionButton icon={Download} label="Download" />
-        <ActionButton icon={Share2} label="Share" />
+      <div className="border-t border-[#334155] px-5 py-4">
+        <div className="flex items-center gap-2">
+          <ActionButton icon={Eye} label="View" onClick={() => router.push(`/payment-history/${payment.id}`)} />
+          <ActionButton icon={Download} label="Download" />
+          <ActionButton icon={Share2} label="Share" />
+        </div>
       </div>
     </motion.div>
   );

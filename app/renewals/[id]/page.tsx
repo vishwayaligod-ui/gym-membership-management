@@ -1,106 +1,96 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, Phone, DollarSign, CreditCard, FileText, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { ArrowLeft, Calendar, Phone, DollarSign, FileText, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { use, useState, useEffect } from "react";
 import { AppHeader } from "@/app/components/AppHeader";
 import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { PageContainer } from "@/app/components/PageContainer";
-import { mockRenewals, type RenewalStatus } from "@/app/renewals/mockRenewals";
 
-type DetailedRenewal = {
-  id: number;
+type RenewalStatus = "Active" | "Due Soon" | "Expired" | "Renewed";
+
+interface RenewalDetail {
+  id: string;
   name: string;
   phone: string;
   plan: string;
-  previousExpiryDate: string;
-  newExpiryDate: string;
-  duration: string;
-  renewalAmount: number;
-  discount: number;
-  finalAmount: number;
-  paymentMethod: string;
-  renewalDate: string;
-  notes: string;
+  expiryDate: string;
+  daysRemaining: number;
+  fee: number;
   status: RenewalStatus;
   avatar: string;
-};
-
-function generateRenewalDetails(id: number): DetailedRenewal | null {
-  const renewal = mockRenewals.find((r) => r.id === id);
-  if (!renewal) return null;
-
-  // Calculate previous expiry date (3 months before current expiry)
-  const currExpiry = new Date(renewal.expiryDate);
-  const prevExpiry = new Date(currExpiry);
-  prevExpiry.setMonth(prevExpiry.getMonth() - 3);
-
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const formatDate = (date: Date) => {
-    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-  };
-
-  // Determine duration based on days remaining
-  let duration = "3 Months";
-  if (renewal.daysRemaining <= 7) duration = "1 Month";
-  else if (renewal.daysRemaining > 30) duration = "12 Months";
-  else if (renewal.daysRemaining > 14) duration = "6 Months";
-
-  // Calculate amounts
-  const baseAmount = renewal.fee;
-  const discount = Math.floor(baseAmount * 0.1); // 10% discount
-  const finalAmount = baseAmount - discount;
-
-  // Payment methods
-  const paymentMethods = ["Cash", "UPI", "Card"];
-  const paymentMethod = paymentMethods[renewal.id % paymentMethods.length];
-
-  // Renewal date (today's date in mock scenario)
-  const renewalDate = "Jul 20, 2026";
-
-  // Notes
-  const notesList = [
-    "Membership successfully renewed for 3 months",
-    "Early renewal bonus: 10% discount applied",
-    "Previous plan: Premium (expired)",
-    "Monthly subscription renewal as per schedule",
-  ];
-  const notes = notesList[renewal.id % notesList.length];
-
-  return {
-    id: renewal.id,
-    name: renewal.name,
-    phone: renewal.phone,
-    plan: renewal.plan,
-    previousExpiryDate: formatDate(prevExpiry),
-    newExpiryDate: renewal.expiryDate,
-    duration,
-    renewalAmount: baseAmount,
-    discount,
-    finalAmount,
-    paymentMethod,
-    renewalDate,
-    notes,
-    status: renewal.status,
-    avatar: renewal.avatar,
-  };
+  planId: string;
+  amount: number;
+  discount: number;
+  finalAmount: number;
+  startDate: string;
+  endDate: string;
+  updatedAt: string;
+  createdAt: string;
+  lastPayment: {
+    id: string;
+    paymentDate: string;
+    paymentStatus: string;
+    amount: number;
+    paymentMode: string;
+  } | null;
 }
 
 const statusStyles: Record<RenewalStatus, { bg: string; text: string; border: string }> = {
   Active: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   "Due Soon": { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
   Expired: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  Renewed: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
 };
 
 const statusIcons: Record<RenewalStatus, typeof CheckCircle2> = {
   Active: CheckCircle2,
   "Due Soon": Clock,
   Expired: AlertCircle,
+  Renewed: CheckCircle2,
 };
 
-export default function RenewalDetailsPage({ params }: { params: { id: string } }) {
+function formatDate(isoString: string): string {
+  const date = new Date(isoString);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+export default function RenewalDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const renewal = generateRenewalDetails(parseInt(params.id));
+  const { id } = use(params);
+  const [renewal, setRenewal] = useState<RenewalDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRenewal() {
+      try {
+        const response = await fetch(`/api/renewals/${id}`);
+        if (!response.ok) throw new Error("Not found");
+        const data = await response.json();
+        setRenewal(data.renewal);
+      } catch (error) {
+        console.error("Failed to fetch renewal:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchRenewal();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div>
+        <AppHeader title="Renewal Details" />
+        <PageContainer>
+          <div className="flex items-center justify-center py-32">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
+        </PageContainer>
+      </div>
+    );
+  }
 
   if (!renewal) {
     return (
@@ -130,6 +120,26 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
   const statusStyle = statusStyles[renewal.status];
   const StatusIcon = statusIcons[renewal.status];
 
+  // Calculate previous expiry date (from startDate or 3 months before current expiry)
+  const prevExpiryDate = formatDate(renewal.startDate);
+
+  // Determine duration from the difference between start and end date
+  const startDateObj = new Date(renewal.startDate);
+  const endDateObj = new Date(renewal.endDate);
+  const diffMonths = Math.round((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const duration = diffMonths <= 1 ? "1 Month" : diffMonths <= 3 ? "3 Months" : diffMonths <= 6 ? "6 Months" : "12 Months";
+
+  // Determine payment method from last payment
+  const paymentMethod = renewal.lastPayment?.paymentMode === "CASH" ? "Cash" :
+    renewal.lastPayment?.paymentMode === "UPI" ? "UPI" :
+    renewal.lastPayment?.paymentMode === "CARD" ? "Card" : "Cash";
+
+  // Renewal date
+  const renewalDate = formatDate(renewal.updatedAt);
+
+  // Notes
+  const notes = `Membership ${renewal.status === "Renewed" ? "renewed" : "updated"} successfully for ${duration}`;
+
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">
       <AppHeader title="Renewal Details" />
@@ -152,7 +162,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
             </button>
             <div>
               <p className="text-2xl font-semibold tracking-tight text-slate-950">Renewal Details</p>
-              <p className="mt-1 text-sm text-slate-500">Renewal ID: RNL-{renewal.id.toString().padStart(6, "0")}</p>
+              <p className="mt-1 text-sm text-slate-500">Renewal ID: RNL-{renewal.id.slice(0, 6).toUpperCase()}</p>
             </div>
           </div>
 
@@ -196,7 +206,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
                 <Calendar className="h-4 w-4 text-slate-400" />
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Previous Expiry Date</p>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{renewal.previousExpiryDate}</p>
+              <p className="text-2xl font-bold text-slate-900">{prevExpiryDate}</p>
             </div>
 
             <div className="rounded-[1.6rem] border border-blue-200 bg-blue-50 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-5">
@@ -204,7 +214,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
                 <Calendar className="h-4 w-4 text-blue-600" />
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">New Expiry Date</p>
               </div>
-              <p className="text-2xl font-bold text-blue-900">{renewal.newExpiryDate}</p>
+              <p className="text-2xl font-bold text-blue-900">{renewal.expiryDate}</p>
             </div>
           </motion.section>
 
@@ -217,17 +227,17 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
           >
             <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Duration</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">{renewal.duration}</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{duration}</p>
             </div>
 
             <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Renewal Date</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">{renewal.renewalDate}</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{renewalDate}</p>
             </div>
 
             <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Payment Method</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">{renewal.paymentMethod}</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{paymentMethod}</p>
             </div>
 
             <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
@@ -251,7 +261,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Renewal Amount</p>
-                <p className="mt-1.5 text-lg font-bold text-slate-900">₹{renewal.renewalAmount.toLocaleString()}</p>
+                <p className="mt-1.5 text-lg font-bold text-slate-900">₹{renewal.amount.toLocaleString()}</p>
               </div>
 
               <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3">
@@ -269,7 +279,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
             <div className="border-t border-slate-100 pt-3 mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">Renewal Amount</span>
-                <span className="font-medium text-slate-900">₹{renewal.renewalAmount.toLocaleString()}</span>
+                <span className="font-medium text-slate-900">₹{renewal.amount.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">Discount Applied</span>
@@ -283,7 +293,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
           </motion.section>
 
           {/* Notes Section */}
-          {renewal.notes && (
+          {notes && (
             <motion.section
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -294,7 +304,7 @@ export default function RenewalDetailsPage({ params }: { params: { id: string } 
                 <FileText className="h-4 w-4 text-slate-400" />
                 <p className="text-base font-semibold text-slate-900">Notes</p>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">{renewal.notes}</p>
+              <p className="text-sm text-slate-600 leading-relaxed">{notes}</p>
             </motion.section>
           )}
 

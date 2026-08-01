@@ -2,25 +2,35 @@
 
 import { motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, FileText, HeartPulse, MapPin, Phone, UserRound, Wallet, CreditCard, ArrowLeft } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, MapPin, Phone, UserRound, Wallet, CreditCard, ArrowLeft, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, use, useEffect } from "react";
 import { z } from "zod";
+import { Toaster, toast } from "sonner";
 import { AppHeader } from "@/app/components/AppHeader";
-import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { FormField } from "@/app/components/FormField";
 import { PageContainer } from "@/app/components/PageContainer";
-import { mockMembers } from "@/app/members/mockMembers";
+
+type MembershipPlan = {
+  id: string;
+  name: string;
+  durationInDays: number;
+  price: number;
+  joiningFee: number;
+  description: string | null;
+  freezeDays: number;
+};
 
 const schema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   mobileNumber: z.string().min(10, "Mobile number should be at least 10 digits"),
+  emailAddress: z.string().email("Enter a valid email address").optional().or(z.literal("")),
   gender: z.string().min(1, "Select a gender"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   address: z.string().min(5, "Address is required"),
   emergencyContact: z.string().min(10, "Emergency contact is required"),
-  membershipPlan: z.string().min(1, "Select a plan"),
+  membershipPlanId: z.string().min(1, "Select a plan"),
   joiningDate: z.string().min(1, "Joining date is required"),
   expiryDate: z.string().min(1, "Expiry date is required"),
   notes: z.string().optional(),
@@ -28,76 +38,139 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function EditMemberPage({ params }: { params: { id: string } }) {
+export default function EditMemberPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [memberNotFound, setMemberNotFound] = useState(false);
 
-  // Get member from mock data
-  const member = mockMembers.find(m => m.id === parseInt(params.id));
-
-  if (!member) {
-    return (
-      <div>
-        <AppHeader title="Edit Member" />
-        <PageContainer>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-32"
-          >
-            <p className="text-slate-600">Member not found</p>
-            <button
-              onClick={() => router.back()}
-              className="mt-4 flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Go Back
-            </button>
-          </motion.div>
-        </PageContainer>
-      </div>
-    );
-  }
-
-  // Mock data for editing (enhanced member data)
-  const mockEditData = {
-    fullName: member.name,
-    mobileNumber: member.phone,
-    gender: "Female", // Mock data
-    dateOfBirth: "1990-05-15", // Mock data
-    address: "Mumbai, Maharashtra, India", // Mock data
-    emergencyContact: "+91 98765 12340",
-    membershipPlan: member.plan,
-    joiningDate: member.joinedOn.split(", ").reverse().join("-").replace(/(\w+) (\d+), (\d+)/, "$3-" + 
-      (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(
-        member.joinedOn.split(" ")[0]
-      ) + 1).toString().padStart(2, "0") + "-" + member.joinedOn.split(", ")[1]),
-    expiryDate: member.expiresOn.split(", ").reverse().join("-").replace(/(\w+) (\d+), (\d+)/, "$3-" +
-      (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(
-        member.expiresOn.split(" ")[0]
-      ) + 1).toString().padStart(2, "0") + "-" + member.expiresOn.split(", ")[1]),
-    notes: "Active member with regular gym attendance.",
-  };
+  // Unwrap params as required by Next.js 16 App Router (client component)
+  const { id } = use(params);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
+    watch,
+    setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: mockEditData,
+    defaultValues: {
+      fullName: "",
+      mobileNumber: "",
+      emailAddress: "",
+      gender: "",
+      dateOfBirth: "",
+      address: "",
+      emergencyContact: "",
+      membershipPlanId: "",
+      joiningDate: "",
+      expiryDate: "",
+      notes: "",
+    },
   });
+
+  const selectedPlanId = watch("membershipPlanId");
+  const joiningDate = watch("joiningDate");
+
+  // Fetch member data and plans
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setIsLoading(true);
+
+        // Fetch member
+        const memberResponse = await fetch(`/api/members/${id}`);
+        if (!memberResponse.ok) {
+          setMemberNotFound(true);
+          return;
+        }
+        const memberData = await memberResponse.json();
+        const member = memberData.member;
+
+        // Fetch plans
+        const plansResponse = await fetch("/api/membership-plans");
+        if (plansResponse.ok) {
+          const plansData = await plansResponse.json();
+          setPlans(plansData);
+        }
+
+        // Get latest membership
+        const latestMembership = member.memberships?.[0];
+
+        // Format dates
+        const formatDate = (dateStr: string) => {
+          if (!dateStr) return "";
+          const d = new Date(dateStr);
+          return d.toISOString().split("T")[0];
+        };
+
+        const formatDOB = (dateStr: string) => {
+          if (!dateStr) return "";
+          const d = new Date(dateStr);
+          return d.toISOString().split("T")[0];
+        };
+
+        reset({
+          fullName: `${member.firstName} ${member.lastName || ""}`.trim(),
+          mobileNumber: member.phone,
+          emailAddress: member.email || "",
+          gender: member.gender === "MALE" ? "Male" : member.gender === "FEMALE" ? "Female" : "Non-binary",
+          dateOfBirth: formatDOB(member.dateOfBirth),
+          address: member.address || "",
+          emergencyContact: member.emergencyPhone || "",
+          membershipPlanId: latestMembership?.planId || "",
+          joiningDate: formatDate(latestMembership?.startDate || member.joiningDate),
+          expiryDate: formatDate(latestMembership?.endDate || ""),
+          notes: member.notes || "",
+        });
+      } catch (error) {
+        console.error("Failed to load member:", error);
+        toast.error("Failed to load member data");
+        setMemberNotFound(true);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [id, reset]);
+
+  // Auto-calculate expiry date when plan or joining date changes
+  useEffect(() => {
+    if (!selectedPlanId || !joiningDate) return;
+
+    const plan = plans.find((p) => p.id === selectedPlanId);
+    if (!plan) return;
+
+    const date = new Date(joiningDate);
+    date.setDate(date.getDate() + plan.durationInDays);
+    const expiry = date.toISOString().split("T")[0];
+    setValue("expiryDate", expiry, { shouldValidate: true });
+  }, [selectedPlanId, joiningDate, plans, setValue]);
 
   const onSubmit = async (values: FormValues) => {
     setIsSaving(true);
     try {
-      // Simulate API call
-      console.log("Saving member:", values);
-      // In a real app, this would be an API call to update the member
-      await new Promise(resolve => setTimeout(resolve, 800));
-      router.push(`/members/${params.id}`);
+      const response = await fetch(`/api/members/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to update member");
+        return;
+      }
+
+      toast.success("Member updated successfully");
+      router.push(`/members/${id}`);
     } catch (error) {
       console.error("Error saving member:", error);
+      toast.error("Failed to update member. Please check your connection.");
     } finally {
       setIsSaving(false);
     }
@@ -107,222 +180,249 @@ export default function EditMemberPage({ params }: { params: { id: string } }) {
     router.back();
   };
 
-  return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,_#f5f8ff_0%,_#eef5ff_100%)] text-slate-900">
-      <AppHeader title={`Edit ${member.name}`} />
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Toaster position="top-right" richColors closeButton />
+        <div className="flex flex-col items-center justify-center py-32">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+          <p className="mt-4 text-base font-semibold text-slate-300">Loading member data...</p>
+        </div>
+      </div>
+    );
+  }
 
-      <PageContainer>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-4"
-        >
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-600 transition hover:border-blue-200 hover:text-blue-600"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
+  if (memberNotFound) {
+    return (
+      <div className="space-y-6">
+        <Toaster position="top-right" richColors closeButton />
+        <div className="flex flex-col items-center justify-center py-32">
+          <p className="text-base font-semibold text-slate-300">Member not found</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Toaster position="top-right" richColors closeButton />
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+          <button
+            onClick={handleCancel}
+            type="button"
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200 active:bg-slate-700"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-2xl font-bold tracking-tight text-slate-100">Edit Member</p>
+            <p className="mt-1 text-sm text-slate-500">Update member information</p>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Personal Information */}
+        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3 sm:p-4 md:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="rounded-lg bg-emerald-900/30 p-2 text-emerald-400">
+              <UserRound className="h-4 w-4" />
+            </div>
             <div>
-              <p className="text-2xl font-semibold tracking-tight text-slate-950">Edit Member</p>
-              <p className="mt-1 text-sm text-slate-500">Update member information</p>
+              <p className="text-sm font-semibold text-slate-200 sm:text-base">Personal Information</p>
+              <p className="text-xs text-slate-500 sm:text-sm">Basic profile and contact details</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Personal Information */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-5"
-            >
-              <div className="mb-4 flex items-center gap-2">
-                <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-600">
-                  <UserRound className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-base font-semibold text-slate-900">Personal Information</p>
-                  <p className="text-sm text-slate-500">Basic profile and contact details</p>
-                </div>
-              </div>
+          <div className="grid gap-4 sm:gap-4 md:grid-cols-2">
+            <FormField label="Full Name" name="fullName" required error={errors.fullName?.message}>
+              <input
+                id="fullName"
+                {...register("fullName")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
+                placeholder="Full name"
+              />
+            </FormField>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="Full Name" name="fullName" required error={errors.fullName?.message}>
-                  <input
-                    id="fullName"
-                    {...register("fullName")}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-                    placeholder="Full name"
+            <FormField label="Mobile Number" name="mobileNumber" required error={errors.mobileNumber?.message}>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                <Phone className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <input
+                  id="mobileNumber"
+                  {...register("mobileNumber")}
+                  className="w-full border-none bg-transparent text-sm text-slate-200 outline-none"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+            </FormField>
+
+            <FormField label="Email Address" name="emailAddress" error={errors.emailAddress?.message}>
+              <input
+                id="emailAddress"
+                type="email"
+                {...register("emailAddress")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
+                placeholder="asha@example.com"
+              />
+            </FormField>
+
+            <FormField label="Gender" name="gender" required error={errors.gender?.message}>
+              <select
+                id="gender"
+                {...register("gender")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
+              >
+                <option value="" className="bg-slate-800 text-slate-400">Select gender</option>
+                <option value="Female" className="bg-slate-800 text-slate-200">Female</option>
+                <option value="Male" className="bg-slate-800 text-slate-200">Male</option>
+                <option value="Non-binary" className="bg-slate-800 text-slate-200">Non-binary</option>
+              </select>
+            </FormField>
+
+            <FormField label="Date of Birth" name="dateOfBirth" required error={errors.dateOfBirth?.message}>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <input
+                  id="dateOfBirth"
+                  type="date"
+                  {...register("dateOfBirth")}
+                  className="w-full border-none bg-transparent text-sm text-slate-200 outline-none [color-scheme:dark]"
+                />
+              </div>
+            </FormField>
+
+            <FormField label="Emergency Contact" name="emergencyContact" required error={errors.emergencyContact?.message}>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                <HeartPulse className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <input
+                  id="emergencyContact"
+                  {...register("emergencyContact")}
+                  className="w-full border-none bg-transparent text-sm text-slate-200 outline-none"
+                  placeholder="+91 98765 12345"
+                />
+              </div>
+            </FormField>
+
+            <div className="md:col-span-2">
+              <FormField label="Address" name="address" required error={errors.address?.message}>
+                <div className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                  <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
+                  <textarea
+                    id="address"
+                    {...register("address")}
+                    className="min-h-[88px] w-full resize-none border-none bg-transparent text-sm text-slate-200 outline-none"
+                    placeholder="House / Flat, locality, city"
                   />
-                </FormField>
-
-                <FormField label="Mobile Number" name="mobileNumber" required error={errors.mobileNumber?.message}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    <input
-                      id="mobileNumber"
-                      {...register("mobileNumber")}
-                      className="w-full border-none bg-transparent text-sm outline-none"
-                      placeholder="+91 98765 43210"
-                    />
-                  </div>
-                </FormField>
-
-                <FormField label="Gender" name="gender" required error={errors.gender?.message}>
-                  <select
-                    id="gender"
-                    {...register("gender")}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-                  >
-                    <option value="">Select gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Non-binary">Non-binary</option>
-                  </select>
-                </FormField>
-
-                <FormField label="Date of Birth" name="dateOfBirth" required error={errors.dateOfBirth?.message}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                    <CalendarDays className="h-4 w-4 text-slate-400" />
-                    <input
-                      id="dateOfBirth"
-                      type="date"
-                      {...register("dateOfBirth")}
-                      className="w-full border-none bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                </FormField>
-
-                <FormField label="Emergency Contact" name="emergencyContact" required error={errors.emergencyContact?.message}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                    <HeartPulse className="h-4 w-4 text-slate-400" />
-                    <input
-                      id="emergencyContact"
-                      {...register("emergencyContact")}
-                      className="w-full border-none bg-transparent text-sm outline-none"
-                      placeholder="+91 98765 12345"
-                    />
-                  </div>
-                </FormField>
-
-                <div className="md:col-span-2">
-                  <FormField label="Address" name="address" required error={errors.address?.message}>
-                    <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                      <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
-                      <textarea
-                        id="address"
-                        {...register("address")}
-                        className="min-h-[88px] w-full resize-none border-none bg-transparent text-sm outline-none"
-                        placeholder="House / Flat, locality, city"
-                      />
-                    </div>
-                  </FormField>
                 </div>
-              </div>
-            </motion.section>
+              </FormField>
+            </div>
+          </div>
+        </section>
 
-            {/* Membership Details */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-              className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-5"
-            >
-              <div className="mb-4 flex items-center gap-2">
-                <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-600">
-                  <CreditCard className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-base font-semibold text-slate-900">Membership Details</p>
-                  <p className="text-sm text-slate-500">Plan, dates and notes</p>
-                </div>
-              </div>
+        {/* Membership Details */}
+        <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3 sm:p-4 md:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="rounded-lg bg-blue-900/30 p-2 text-blue-400">
+              <CreditCard className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-200 sm:text-base">Membership Details</p>
+              <p className="text-xs text-slate-500 sm:text-sm">Plan, dates and notes</p>
+            </div>
+          </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="Membership Plan" name="membershipPlan" required error={errors.membershipPlan?.message}>
-                  <select
-                    id="membershipPlan"
-                    {...register("membershipPlan")}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-                  >
-                    <option value="Classic">Classic</option>
-                    <option value="Premium">Premium</option>
-                    <option value="Platinum">Platinum</option>
-                  </select>
-                </FormField>
-
-                <FormField label="Joining Date" name="joiningDate" required error={errors.joiningDate?.message}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                    <CalendarDays className="h-4 w-4 text-slate-400" />
-                    <input
-                      id="joiningDate"
-                      type="date"
-                      {...register("joiningDate")}
-                      className="w-full border-none bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                </FormField>
-
-                <FormField label="Expiry Date" name="expiryDate" required error={errors.expiryDate?.message}>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                    <CalendarDays className="h-4 w-4 text-slate-400" />
-                    <input
-                      id="expiryDate"
-                      type="date"
-                      {...register("expiryDate")}
-                      className="w-full border-none bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                </FormField>
-
-                <div className="md:col-span-2">
-                  <FormField label="Notes" name="notes" hint="Optional details for the account" error={errors.notes?.message}>
-                    <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white">
-                      <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
-                      <textarea
-                        id="notes"
-                        {...register("notes")}
-                        className="min-h-[90px] w-full resize-none border-none bg-transparent text-sm outline-none"
-                        placeholder="Training preferences, package notes, and follow-up reminders"
-                      />
-                    </div>
-                  </FormField>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* Action Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-              className="flex flex-col-reverse gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:flex-row sm:justify-end"
-            >
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-blue-200 hover:text-blue-600 disabled:opacity-50"
+          <div className="grid gap-4 sm:gap-4 md:grid-cols-2">
+            <FormField label="Membership Plan" name="membershipPlanId" required error={errors.membershipPlanId?.message}>
+              <select
+                id="membershipPlanId"
+                {...register("membershipPlanId")}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </motion.div>
-          </form>
-        </motion.div>
-      </PageContainer>
+                <option value="" className="bg-slate-800 text-slate-400">Select a plan</option>
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id} className="bg-slate-800 text-slate-200">
+                    {plan.name} — ₹{Number(plan.price).toLocaleString("en-IN")} ({plan.durationInDays} days)
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-      <BottomNavigation />
+            <FormField label="Joining Date" name="joiningDate" required error={errors.joiningDate?.message}>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <input
+                  id="joiningDate"
+                  type="date"
+                  {...register("joiningDate")}
+                  className="w-full border-none bg-transparent text-sm text-slate-200 outline-none [color-scheme:dark]"
+                />
+              </div>
+            </FormField>
+
+            <FormField label="Expiry Date" name="expiryDate" required error={errors.expiryDate?.message}>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <input
+                  id="expiryDate"
+                  type="date"
+                  {...register("expiryDate")}
+                  className="w-full border-none bg-transparent text-sm text-slate-200 outline-none [color-scheme:dark]"
+                  readOnly
+                />
+              </div>
+            </FormField>
+
+            <div className="md:col-span-2">
+              <FormField label="Notes" name="notes" hint="Optional details for the account" error={errors.notes?.message}>
+                <div className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                  <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
+                  <textarea
+                    id="notes"
+                    {...register("notes")}
+                    className="min-h-[90px] w-full resize-none border-none bg-transparent text-sm text-slate-200 outline-none"
+                    placeholder="Training preferences, package notes, and follow-up reminders"
+                  />
+                </div>
+              </FormField>
+            </div>
+          </div>
+        </section>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="min-h-12 flex-1 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200 active:bg-slate-700 sm:flex-none sm:px-6"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:from-emerald-500 hover:to-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-6"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
