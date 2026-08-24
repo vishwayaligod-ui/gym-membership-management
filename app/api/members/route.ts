@@ -254,10 +254,17 @@ export async function POST(request: Request) {
     }
 
     // Generate member code
-    const memberCount = await prisma.member.count({
-      where: { gymId: gym.id },
-    });
-    const memberCode = `M${String(memberCount + 1).padStart(5, "0")}`;
+    const lastMember = await prisma.member.findFirst({
+  where: { gymId: gym.id },
+  orderBy: { memberCode: "desc" },
+  select: { memberCode: true },
+});
+
+const lastNumber = lastMember
+  ? parseInt(lastMember.memberCode.replace("M", ""), 10)
+  : 0;
+
+const memberCode = `M${String(lastNumber + 1).padStart(5, "0")}`;
 
     // Split full name into first and last name
     const nameParts = fullName.trim().split(/\s+/);
