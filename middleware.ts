@@ -53,7 +53,15 @@ export async function middleware(request: NextRequest) {
   const isDemoMode = process.env.DEMO_MODE === "true";
   const isDevelopment = process.env.NODE_ENV === "development";
 
-  let token = (await getToken({ req: request, secret })) as MiddlewareToken | null;
+ const isProduction = process.env.NODE_ENV === "production";
+
+let token = (await getToken({
+  req: request,
+  secret,
+  cookieName: isProduction
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token",
+})) as MiddlewareToken | null;
   const seededDemoSession = isDemoMode && isDevelopment && !token;
 
   if (seededDemoSession) {
