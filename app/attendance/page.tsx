@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -20,6 +20,7 @@ import { Card } from "../components/v4/Card";
 import { FadeUp } from "../components/v4/MotionDiv";
 import { QuickCheckInCard } from "../components/QuickCheckInCard";
 import { Toast } from "../components/Toast";
+import { useMountedDateString } from "../components/useMountedDateString";
 
 type AttendanceResponse = {
   records: AttendanceRecord[];
@@ -38,9 +39,27 @@ type AttendanceMembersResponse = {
 };
 
 export default function AttendancePage() {
+  // Dates are formatted only after mount to avoid hydration mismatches:
+  // iOS Safari's locale output differs from the Node.js server render.
+  const todayFullDate = useMountedDateString(() =>
+    new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  );
+  const todayShortDate = useMountedDateString(() =>
+    new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    })
+  );
   const [checkInSearch, setCheckInSearch] = useState("");
   const [selectedMember, setSelectedMember] = useState<CheckInMember | null>(null);
   const [checkInMembers, setCheckInMembers] = useState<CheckInMember[]>([]);
+  const latestSearchRef = useRef("");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState({
     totalMembers: 0,
@@ -94,6 +113,7 @@ export default function AttendancePage() {
   }, [checkInSearch, showToast]);
 
   const loadMembers = useCallback(async (searchTerm = checkInSearch) => {
+    latestSearchRef.current = searchTerm;
     try {
       const params = new URLSearchParams();
       if (searchTerm.trim()) {
@@ -106,10 +126,14 @@ export default function AttendancePage() {
       }
 
       const data: AttendanceMembersResponse = await response.json();
-      setCheckInMembers(data.members || []);
+      if (latestSearchRef.current === searchTerm) {
+        setCheckInMembers(data.members || []);
+      }
     } catch (error) {
       console.error("Failed to load check-in members", error);
-      setCheckInMembers([]);
+      if (latestSearchRef.current === searchTerm) {
+        setCheckInMembers([]);
+      }
     }
   }, [checkInSearch]);
 
@@ -238,12 +262,7 @@ export default function AttendancePage() {
                   Attendance Management
                 </h1>
                 <p className="mt-1 text-[14px] text-[#64748B]">
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {todayFullDate}
                 </p>
               </div>
           </motion.div>
@@ -510,11 +529,7 @@ export default function AttendancePage() {
                 <div>
                   <p className="text-[13px] font-semibold text-[#F8FAFC]">Today's Summary</p>
                   <p className="text-[11px] text-[#64748B]">
-                    {new Date().toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {todayShortDate}
                   </p>
                 </div>
               </div>

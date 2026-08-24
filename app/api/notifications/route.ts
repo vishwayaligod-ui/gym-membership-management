@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, PaymentStatus } from "@prisma/client";
 import type { NotificationsResponse } from "@/app/notifications/types";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
+    const access = await requireApiPermission("notifications", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);

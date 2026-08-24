@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus, MemberStatus, MembershipStatus } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 const attendanceQuerySchema = z.object({
   search: z.string().optional().default(""),
@@ -60,7 +60,12 @@ class ApiError extends Error {
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
+    const access = await requireApiPermission("attendance", "read");
+    if (access.response) {
+      return access.response;
+    }
+
+    const session = access.session;
     const gymId = session?.user?.gymId ?? undefined;
     const branchId = session?.user?.branchId ?? undefined;
 
@@ -148,7 +153,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
+    const access = await requireApiPermission("attendance", "create");
+    if (access.response) {
+      return access.response;
+    }
+
+    const session = access.session;
     const gymId = session?.user?.gymId ?? undefined;
     const branchId = session?.user?.branchId ?? undefined;
 

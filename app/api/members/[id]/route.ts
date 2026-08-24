@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Gender, MemberStatus, MembershipStatus, PaymentMode, PaymentStatus } from "@prisma/client";
+import { Gender, MemberStatus, MembershipStatus, PaymentMode, PaymentStatus, Prisma } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("members", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const member = await prisma.member.findUnique({
@@ -48,6 +54,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("members", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -127,30 +138,48 @@ export async function PUT(
       },
     });
 
-    // If plan or dates changed, update the active membership
+    // If plan or dates changed, update the membership so the plan change
+    // persists. The members list reads the latest membership by startDate
+    // regardless of status, so we update that record (reactivating it).
+    // If the member has no membership yet, create one instead of silently
+    // dropping the plan change.
     if (membershipPlanId && joiningDate && expiryDate) {
-      const activeMembership = await prisma.membership.findFirst({
-        where: {
-          memberId: id,
-          status: MembershipStatus.ACTIVE,
-        },
-        orderBy: { startDate: "desc" },
+      const plan = await prisma.membershipPlan.findUnique({
+        where: { id: membershipPlanId },
       });
 
-      if (activeMembership) {
-        const plan = await prisma.membershipPlan.findUnique({
-          where: { id: membershipPlanId },
+      if (plan) {
+        const latestMembership = await prisma.membership.findFirst({
+          where: { memberId: id },
+          orderBy: { startDate: "desc" },
         });
 
-        if (plan) {
+        if (latestMembership) {
           await prisma.membership.update({
-            where: { id: activeMembership.id },
+            where: { id: latestMembership.id },
             data: {
               planId: membershipPlanId,
               startDate: new Date(joiningDate),
               endDate: new Date(expiryDate),
               amount: plan.price,
               finalAmount: plan.price,
+              status: MembershipStatus.ACTIVE,
+            },
+          });
+        } else {
+          await prisma.membership.create({
+            data: {
+              gymId: member.gymId,
+              branchId: member.branchId,
+              memberId: id,
+              planId: membershipPlanId,
+              startDate: new Date(joiningDate),
+              endDate: new Date(expiryDate),
+              amount: plan.price,
+              discount: 0,
+              finalAmount: plan.price,
+              status: MembershipStatus.ACTIVE,
+              remarks: member.notes || null,
             },
           });
         }
@@ -179,6 +208,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("members", "delete");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const existingMember = await prisma.member.findUnique({
@@ -199,8 +233,16 @@ export async function DELETE(
     return NextResponse.json({
       message: "Member deleted successfully",
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to delete member:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      return NextResponse.json(
+        {
+          error: "This member cannot be deleted because related records (attendance, payments, memberships, etc.) still exist. Remove or reassign those records first, then try again.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { error: "Failed to delete member" },
       { status: 500 }

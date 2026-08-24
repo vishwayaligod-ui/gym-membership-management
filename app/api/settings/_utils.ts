@@ -47,15 +47,6 @@ export function toSettingsPayload(record: GymWithSettings): GymSettingsPayload {
       favicon: settings?.favicon ?? "",
     },
     membershipSettings: {
-      defaultMembershipDurationDays:
-        settings?.defaultMembershipDurationDays ??
-        defaults.membershipSettings.defaultMembershipDurationDays,
-      defaultFreezeDays: settings?.defaultFreezeDays ?? defaults.membershipSettings.defaultFreezeDays,
-      allowMultipleActiveMemberships:
-        settings?.allowMultipleActiveMemberships ??
-        defaults.membershipSettings.allowMultipleActiveMemberships,
-      autoActivateMembership:
-        settings?.autoActivateMembership ?? defaults.membershipSettings.autoActivateMembership,
       membershipExpiryReminder:
         settings?.membershipExpiryReminder ?? defaults.membershipSettings.membershipExpiryReminder,
       reminderBeforeDays:
@@ -66,26 +57,16 @@ export function toSettingsPayload(record: GymWithSettings): GymSettingsPayload {
         defaults.membershipSettings.gracePeriodAfterExpiryDays,
     },
     paymentSettings: {
-      currency: settings?.currency ?? record.currency,
-      currencySymbol: settings?.currencySymbol ?? defaults.paymentSettings.currencySymbol,
-      taxPercentage: settings ? Number(settings.taxPercentage) : defaults.paymentSettings.taxPercentage,
-      lateFee: settings ? Number(settings.lateFee) : defaults.paymentSettings.lateFee,
-      receiptPrefix: settings?.receiptPrefix ?? defaults.paymentSettings.receiptPrefix,
-      invoicePrefix: settings?.invoicePrefix ?? defaults.paymentSettings.invoicePrefix,
       autoGenerateReceiptNumber:
         settings?.autoGenerateReceiptNumber ?? defaults.paymentSettings.autoGenerateReceiptNumber,
     },
     attendanceSettings: {
       allowMultipleCheckIns:
         settings?.allowMultipleCheckIns ?? defaults.attendanceSettings.allowMultipleCheckIns,
-      lateArrivalThresholdMins:
-        settings?.lateArrivalThresholdMins ?? defaults.attendanceSettings.lateArrivalThresholdMins,
       workingHoursStart: settings?.workingHoursStart ?? defaults.attendanceSettings.workingHoursStart,
       workingHoursEnd: settings?.workingHoursEnd ?? defaults.attendanceSettings.workingHoursEnd,
       checkInWindowStart: settings?.checkInWindowStart ?? defaults.attendanceSettings.checkInWindowStart,
       checkInWindowEnd: settings?.checkInWindowEnd ?? defaults.attendanceSettings.checkInWindowEnd,
-      attendanceAutoCloseTime:
-        settings?.attendanceAutoCloseTime ?? defaults.attendanceSettings.attendanceAutoCloseTime,
     },
     notificationSettings: {
       whatsappNotifications:
@@ -98,13 +79,6 @@ export function toSettingsPayload(record: GymWithSettings): GymSettingsPayload {
       birthdayWishes: settings?.birthdayWishes ?? defaults.notificationSettings.birthdayWishes,
       attendanceReminder:
         settings?.attendanceReminder ?? defaults.notificationSettings.attendanceReminder,
-    },
-    userPreferences: {
-      defaultDashboard: settings?.defaultDashboard ?? defaults.userPreferences.defaultDashboard,
-      defaultLanguage: settings?.defaultLanguage ?? defaults.userPreferences.defaultLanguage,
-      dateFormat: settings?.dateFormat ?? defaults.userPreferences.dateFormat,
-      timeFormat: settings?.timeFormat ?? defaults.userPreferences.timeFormat,
-      timezone: settings?.timezone ?? record.timezone,
     },
     security: {
       requirePasswordChange:
@@ -131,9 +105,10 @@ export function mapBackupItems(
   }));
 }
 
-export function toPrismaSettingsUpdate(payload: GymSettingsPayload): Prisma.GymSettingsUncheckedCreateInput {
+export function toPrismaSettingsUpdate(
+  payload: GymSettingsPayload
+): Omit<Prisma.GymSettingsUncheckedCreateInput, "gymId"> {
   return {
-    gymId: "",
     gymName: payload.gymInformation.gymName,
     ownerName: payload.gymInformation.ownerName,
     email: payload.gymInformation.email,
@@ -153,27 +128,15 @@ export function toPrismaSettingsUpdate(payload: GymSettingsPayload): Prisma.GymS
     secondaryColor: payload.branding.secondaryColor,
     brandingLogo: payload.branding.gymLogo || null,
     favicon: payload.branding.favicon || null,
-    defaultMembershipDurationDays: payload.membershipSettings.defaultMembershipDurationDays,
-    defaultFreezeDays: payload.membershipSettings.defaultFreezeDays,
-    allowMultipleActiveMemberships: payload.membershipSettings.allowMultipleActiveMemberships,
-    autoActivateMembership: payload.membershipSettings.autoActivateMembership,
     membershipExpiryReminder: payload.membershipSettings.membershipExpiryReminder,
     reminderBeforeDays: payload.membershipSettings.reminderBeforeDays,
     gracePeriodAfterExpiryDays: payload.membershipSettings.gracePeriodAfterExpiryDays,
-    currency: payload.paymentSettings.currency,
-    currencySymbol: payload.paymentSettings.currencySymbol,
-    taxPercentage: new Prisma.Decimal(payload.paymentSettings.taxPercentage),
-    lateFee: new Prisma.Decimal(payload.paymentSettings.lateFee),
-    receiptPrefix: payload.paymentSettings.receiptPrefix,
-    invoicePrefix: payload.paymentSettings.invoicePrefix,
     autoGenerateReceiptNumber: payload.paymentSettings.autoGenerateReceiptNumber,
     allowMultipleCheckIns: payload.attendanceSettings.allowMultipleCheckIns,
-    lateArrivalThresholdMins: payload.attendanceSettings.lateArrivalThresholdMins,
     workingHoursStart: payload.attendanceSettings.workingHoursStart,
     workingHoursEnd: payload.attendanceSettings.workingHoursEnd,
     checkInWindowStart: payload.attendanceSettings.checkInWindowStart,
     checkInWindowEnd: payload.attendanceSettings.checkInWindowEnd,
-    attendanceAutoCloseTime: payload.attendanceSettings.attendanceAutoCloseTime,
     whatsappNotifications: payload.notificationSettings.whatsappNotifications,
     smsNotifications: payload.notificationSettings.smsNotifications,
     emailNotifications: payload.notificationSettings.emailNotifications,
@@ -181,11 +144,6 @@ export function toPrismaSettingsUpdate(payload: GymSettingsPayload): Prisma.GymS
     paymentReminder: payload.notificationSettings.paymentReminder,
     birthdayWishes: payload.notificationSettings.birthdayWishes,
     attendanceReminder: payload.notificationSettings.attendanceReminder,
-    defaultDashboard: payload.userPreferences.defaultDashboard,
-    defaultLanguage: payload.userPreferences.defaultLanguage,
-    dateFormat: payload.userPreferences.dateFormat,
-    timeFormat: payload.userPreferences.timeFormat,
-    timezone: payload.userPreferences.timezone,
     requirePasswordChange: payload.security.requirePasswordChange,
     sessionTimeoutMinutes: payload.security.sessionTimeoutMinutes,
     twoFactorAuthentication: payload.security.twoFactorAuthentication,

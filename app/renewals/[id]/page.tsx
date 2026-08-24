@@ -5,7 +5,6 @@ import { ArrowLeft, Calendar, Phone, DollarSign, FileText, CheckCircle2, AlertCi
 import { useRouter } from "next/navigation";
 import { use, useState, useEffect } from "react";
 import { AppHeader } from "@/app/components/AppHeader";
-import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { PageContainer } from "@/app/components/PageContainer";
 
 type RenewalStatus = "Active" | "Due Soon" | "Expired" | "Renewed";
@@ -330,8 +329,6 @@ export default function RenewalDetailsPage({ params }: { params: Promise<{ id: s
           </motion.div>
         </motion.div>
       </PageContainer>
-
-      <BottomNavigation />
     </div>
   );
 }

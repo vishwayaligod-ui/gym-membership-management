@@ -43,8 +43,7 @@ export function QuickCheckInCard({
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const filteredResults = searchQuery.trim() ? members : [];
-
+  const filteredResults = members;
   const updateDropdownPosition = useCallback(() => {
     if (inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
@@ -136,7 +135,7 @@ export function QuickCheckInCard({
               if (e.target.value.trim()) setShowDropdown(true);
             }}
             onFocus={() => {
-              if (searchQuery.trim() && filteredResults.length > 0) setShowDropdown(true);
+              if (filteredResults.length > 0) setShowDropdown(true);
             }}
             className="w-full rounded-xl border-[1.5px] border-[#334155] bg-[#0F172A] py-[14px] pl-12 pr-4 text-[15px] text-[#F8FAFC] outline-none placeholder:text-[#64748B] transition-all focus:border-[#3B82F6] focus:bg-[#0F172A] shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus:shadow-[0_4px_16px_rgba(59,130,246,0.12)]"
           />

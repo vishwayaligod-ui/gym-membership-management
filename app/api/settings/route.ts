@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { defaultGymSettings, type GymSettingsPayload } from "@/app/settings/types";
 import { getPrimaryGym, mapBackupItems, toPrismaSettingsUpdate, toSettingsPayload } from "./_utils";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 const phoneRegex = /^\+?[0-9][0-9\s-]{7,14}$/;
 const pincodeRegex = /^\d{4,10}$/;
@@ -65,31 +66,19 @@ const settingsSchema: z.ZodType<GymSettingsPayload> = z.object({
     favicon: z.string().optional().default(""),
   }),
   membershipSettings: z.object({
-    defaultMembershipDurationDays: z.number().int().min(1).max(730),
-    defaultFreezeDays: z.number().int().min(0).max(90),
-    allowMultipleActiveMemberships: z.boolean(),
-    autoActivateMembership: z.boolean(),
     membershipExpiryReminder: z.boolean(),
     reminderBeforeDays: z.union([z.literal(1), z.literal(3), z.literal(7), z.literal(15)]),
     gracePeriodAfterExpiryDays: z.number().int().min(0).max(60),
   }),
   paymentSettings: z.object({
-    currency: z.string().trim().min(3),
-    currencySymbol: z.string().trim().min(1).max(4),
-    taxPercentage: z.number().min(0).max(100),
-    lateFee: z.number().min(0).max(1000000),
-    receiptPrefix: z.string().trim().min(2).max(12),
-    invoicePrefix: z.string().trim().min(2).max(12),
     autoGenerateReceiptNumber: z.boolean(),
   }),
   attendanceSettings: z.object({
     allowMultipleCheckIns: z.boolean(),
-    lateArrivalThresholdMins: z.number().int().min(0).max(240),
     workingHoursStart: z.string().trim().regex(/^\d{2}:\d{2}$/),
     workingHoursEnd: z.string().trim().regex(/^\d{2}:\d{2}$/),
     checkInWindowStart: z.string().trim().regex(/^\d{2}:\d{2}$/),
     checkInWindowEnd: z.string().trim().regex(/^\d{2}:\d{2}$/),
-    attendanceAutoCloseTime: z.string().trim().regex(/^\d{2}:\d{2}$/),
   }),
   notificationSettings: z.object({
     whatsappNotifications: z.boolean(),
@@ -99,13 +88,6 @@ const settingsSchema: z.ZodType<GymSettingsPayload> = z.object({
     paymentReminder: z.boolean(),
     birthdayWishes: z.boolean(),
     attendanceReminder: z.boolean(),
-  }),
-  userPreferences: z.object({
-    defaultDashboard: z.string().trim().min(2),
-    defaultLanguage: z.string().trim().min(2),
-    dateFormat: z.string().trim().min(5),
-    timeFormat: z.string().trim().min(2),
-    timezone: z.string().trim().min(3),
   }),
   security: z.object({
     requirePasswordChange: z.boolean(),
@@ -132,6 +114,11 @@ function validationErrorResponse(error: z.ZodError) {
 
 export async function GET() {
   try {
+    const access = await requireApiPermission("settings", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
@@ -167,14 +154,6 @@ export async function GET() {
           pincode: gym.pincode ?? "",
           gymLogo: gym.logo ?? "",
         },
-        paymentSettings: {
-          ...defaultGymSettings.paymentSettings,
-          currency: gym.currency,
-        },
-        userPreferences: {
-          ...defaultGymSettings.userPreferences,
-          timezone: gym.timezone,
-        },
       },
       backups: mapBackupItems(backups),
     });
@@ -186,6 +165,11 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const access = await requireApiPermission("settings", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
@@ -214,8 +198,6 @@ export async function PUT(request: Request) {
           state: settings.gymInformation.state,
           country: settings.gymInformation.country,
           pincode: settings.gymInformation.pincode,
-          timezone: settings.userPreferences.timezone,
-          currency: settings.paymentSettings.currency,
         },
       });
 

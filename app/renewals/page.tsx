@@ -1,12 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, AlertCircle, CheckCircle2, Clock, Search } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { RenewalForm } from "@/app/renewals/RenewalForm";
+import { useMountedDateString } from "@/app/components/useMountedDateString";
 
 interface RenewalMember {
   id: string;
+  memberId: string;
   name: string;
   plan: string;
   phone: string;
@@ -118,7 +121,7 @@ function RenewalCard({ renewal, onRenew }: { renewal: RenewalMember; onRenew: (r
       {/* Action Section */}
       <div className="border-t border-[#334155] px-5 py-4">
         <button
-          onClick={() => onRenew(renewal.daysRemaining < 0 ? `/renewals/${renewal.id}` : `/renewals/add`)}
+          onClick={() => onRenew(renewal.daysRemaining < 0 ? `/renewals/${renewal.id}` : `/renewals/add?memberId=${renewal.memberId}`)}
           type="button"
           className={`w-full rounded-xl px-4 py-3 text-[13px] font-semibold transition-all duration-200 ${
             renewal.daysRemaining < 0
@@ -133,8 +136,18 @@ function RenewalCard({ renewal, onRenew }: { renewal: RenewalMember; onRenew: (r
   );
 }
 
-export default function RenewalsPage() {
+function RenewalsDashboard() {
   const router = useRouter();
+  // Date is formatted only after mount to avoid hydration mismatches
+  // (iOS Safari's locale output differs from the Node.js server render).
+  const todayDate = useMountedDateString(() =>
+    new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [renewals, setRenewals] = useState<RenewalMember[]>([]);
@@ -208,12 +221,7 @@ export default function RenewalsPage() {
             Membership Renewals
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {todayDate}
           </p>
         </div>
       </motion.div>
@@ -373,5 +381,26 @@ export default function RenewalsPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+function RenewalsPageContent() {
+  const searchParams = useSearchParams();
+  const memberId = searchParams.get("memberId");
+
+  if (memberId) {
+    return <RenewalForm initialMemberId={memberId} />;
+  }
+
+  return <RenewalsDashboard />;
+}
+
+export default function RenewalsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-32">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+    </div>}>
+      <RenewalsPageContent />
+    </Suspense>
   );
 }

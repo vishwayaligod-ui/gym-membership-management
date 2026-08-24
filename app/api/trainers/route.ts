@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { TrainerStatus } from "@/app/trainers/types";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 type TrainerRecord = {
   id: string;
@@ -71,6 +72,11 @@ function mapTrainer(record: TrainerRecord, assignedMembers: number) {
 
 export async function GET() {
   try {
+    const access = await requireApiPermission("trainers", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const [trainerProfiles, assignmentGroups] = await Promise.all([
       prisma.trainerProfile.findMany({
         include: {
@@ -126,6 +132,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("trainers", "create");
+    if (access.response) {
+      return access.response;
+    }
+
     const body = await request.json();
 
     const name = (body.name as string | undefined)?.trim();

@@ -9,7 +9,6 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { z } from "zod";
 import { Toaster, toast } from "sonner";
 import { AppHeader } from "@/app/components/AppHeader";
-import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { FormField } from "@/app/components/FormField";
 import { PageContainer } from "@/app/components/PageContainer";
 
@@ -647,8 +646,6 @@ export default function AddPaymentPage() {
           </form>
         </motion.div>
       </PageContainer>
-
-      <BottomNavigation />
     </div>
   );
 }

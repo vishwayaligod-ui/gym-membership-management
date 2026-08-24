@@ -355,9 +355,9 @@ export default function PaymentHistoryPage() {
         ) : (
           <>
             <FadeUp delay={0.15}>
-              <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+              <div className="overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-800/40">
                 {/* Table Header */}
-                <div className="hidden md:grid md:grid-cols-[56px_180px_120px_110px_110px_120px_140px_120px_60px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                <div className="hidden md:grid md:grid-cols-[56px_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_60px_40px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
                   <div />
                   <div>Member</div>
                   <div>Plan</div>
@@ -384,7 +384,7 @@ export default function PaymentHistoryPage() {
                         onMouseEnter={() => setHoveredRow(payment.id)}
                         onMouseLeave={() => setHoveredRow(null)}
                         onClick={() => router.push(`/payment-history/${payment.id}`)}
-                        className={`grid grid-cols-1 md:grid-cols-[56px_180px_120px_110px_110px_120px_140px_120px_60px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
+                        className={`grid grid-cols-1 md:grid-cols-[56px_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_60px_40px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
                           hoveredRow === payment.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
                         }`}
                       >
@@ -429,8 +429,8 @@ export default function PaymentHistoryPage() {
                         </div>
 
                         {/* Desktop: Plan */}
-                        <div className="hidden md:flex items-center">
-                          <span className="text-[12px] text-slate-400 whitespace-nowrap">{payment.plan}</span>
+                        <div className="hidden md:flex items-center min-w-0">
+                          <span className="text-[12px] text-slate-400 truncate" title={payment.plan}>{payment.plan}</span>
                         </div>
 
                         {/* Desktop: Amount */}

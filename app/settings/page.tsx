@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -18,7 +19,6 @@ import {
   Receipt,
   RefreshCcw,
   Save,
-  Settings2,
   Shield,
   Users,
   Wallet,
@@ -48,48 +48,11 @@ const settingsSections: SettingsSection[] = [
   { id: "payments", label: "Payments", icon: Wallet },
   { id: "attendance", label: "Attendance", icon: Check },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "preferences", label: "User Preferences", icon: Settings2 },
   { id: "security", label: "Security", icon: Shield },
   { id: "backup", label: "Backup", icon: Database },
 ];
 
 const reminderBeforeOptions = [1, 3, 7, 15] as const;
-
-const currencyOptions = [
-  { value: "INR", label: "INR" },
-  { value: "USD", label: "USD" },
-  { value: "EUR", label: "EUR" },
-  { value: "GBP", label: "GBP" },
-];
-
-const defaultDashboardOptions = [
-  { value: "overview", label: "Overview" },
-  { value: "members", label: "Members" },
-  { value: "attendance", label: "Attendance" },
-  { value: "payments", label: "Payments" },
-  { value: "reports", label: "Reports" },
-];
-
-const defaultLanguageOptions = [
-  { value: "en", label: "English" },
-  { value: "hi", label: "Hindi" },
-  { value: "ta", label: "Tamil" },
-  { value: "te", label: "Telugu" },
-];
-
-const dateFormatOptions = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"];
-const timeFormatOptions = [
-  { value: "12h", label: "12 Hour" },
-  { value: "24h", label: "24 Hour" },
-];
-
-const timezoneOptions = [
-  "Asia/Kolkata",
-  "Asia/Dubai",
-  "Asia/Singapore",
-  "Europe/London",
-  "America/New_York",
-];
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -551,6 +514,13 @@ export default function SettingsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/settings/user-management"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-600 hover:text-slate-100"
+              >
+                <Users className="h-3.5 w-3.5" />
+                User Management
+              </Link>
             <button
               type="button"
               onClick={fetchSettings}
@@ -964,41 +934,9 @@ export default function SettingsPage() {
             id="membership"
             icon={Users}
             title="Membership Settings"
-            subtitle="Defaults, lifecycle controls, and expiry automation"
+            subtitle="Lifecycle controls and expiry automation"
           >
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Default Membership Duration (Days)" name="defaultDuration">
-                <input
-                  type="number"
-                  min={1}
-                  max={730}
-                  value={settings.membershipSettings.defaultMembershipDurationDays}
-                  onChange={(event) =>
-                    setPartialSettings("membershipSettings", {
-                      ...settings.membershipSettings,
-                      defaultMembershipDurationDays: Number(event.target.value) || 1,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Default Freeze Days" name="defaultFreezeDays">
-                <input
-                  type="number"
-                  min={0}
-                  max={90}
-                  value={settings.membershipSettings.defaultFreezeDays}
-                  onChange={(event) =>
-                    setPartialSettings("membershipSettings", {
-                      ...settings.membershipSettings,
-                      defaultFreezeDays: Number(event.target.value) || 0,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
               <FormField label="Reminder Before" name="reminderBeforeDays">
                 <select
                   value={settings.membershipSettings.reminderBeforeDays}
@@ -1038,40 +976,6 @@ export default function SettingsPage() {
             <div className="mt-4 grid gap-3">
               <div className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-200">Allow Multiple Active Memberships</p>
-                  <p className="text-xs text-slate-500">Let a member have more than one active plan</p>
-                </div>
-                <ToggleSwitch
-                  id="allowMultipleActiveMemberships"
-                  enabled={settings.membershipSettings.allowMultipleActiveMemberships}
-                  onChange={() =>
-                    setPartialSettings("membershipSettings", {
-                      ...settings.membershipSettings,
-                      allowMultipleActiveMemberships: !settings.membershipSettings.allowMultipleActiveMemberships,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-200">Auto Activate Membership</p>
-                  <p className="text-xs text-slate-500">Automatically activate on successful signup payment</p>
-                </div>
-                <ToggleSwitch
-                  id="autoActivateMembership"
-                  enabled={settings.membershipSettings.autoActivateMembership}
-                  onChange={() =>
-                    setPartialSettings("membershipSettings", {
-                      ...settings.membershipSettings,
-                      autoActivateMembership: !settings.membershipSettings.autoActivateMembership,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
-                <div>
                   <p className="text-sm font-medium text-slate-200">Membership Expiry Reminder</p>
                   <p className="text-xs text-slate-500">Enable reminders before membership expires</p>
                 </div>
@@ -1093,100 +997,9 @@ export default function SettingsPage() {
             id="payments"
             icon={Receipt}
             title="Payment Settings"
-            subtitle="Currency, tax, fees, and receipt number strategy"
+            subtitle="Receipt number strategy"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Currency" name="currency">
-                <select
-                  value={settings.paymentSettings.currency}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      currency: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                >
-                  {currencyOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Currency Symbol" name="currencySymbol">
-                <input
-                  value={settings.paymentSettings.currencySymbol}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      currencySymbol: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Tax Percentage" name="taxPercentage">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={settings.paymentSettings.taxPercentage}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      taxPercentage: Number(event.target.value) || 0,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Late Fee" name="lateFee">
-                <input
-                  type="number"
-                  min={0}
-                  value={settings.paymentSettings.lateFee}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      lateFee: Number(event.target.value) || 0,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Receipt Prefix" name="receiptPrefix">
-                <input
-                  value={settings.paymentSettings.receiptPrefix}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      receiptPrefix: event.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm uppercase text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Invoice Prefix" name="invoicePrefix">
-                <input
-                  value={settings.paymentSettings.invoicePrefix}
-                  onChange={(event) =>
-                    setPartialSettings("paymentSettings", {
-                      ...settings.paymentSettings,
-                      invoicePrefix: event.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm uppercase text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
+            <div className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
               <div>
                 <p className="text-sm font-medium text-slate-200">Auto Generate Receipt Number</p>
                 <p className="text-xs text-slate-500">Generate unique receipt number for each new payment</p>
@@ -1208,39 +1021,9 @@ export default function SettingsPage() {
             id="attendance"
             icon={Clock3}
             title="Attendance Settings"
-            subtitle="Check-in rules, thresholds, hours, and auto-close controls"
+            subtitle="Check-in rules, hours, and window controls"
           >
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Late Arrival Threshold (Minutes)" name="lateArrivalThresholdMins">
-                <input
-                  type="number"
-                  min={0}
-                  max={240}
-                  value={settings.attendanceSettings.lateArrivalThresholdMins}
-                  onChange={(event) =>
-                    setPartialSettings("attendanceSettings", {
-                      ...settings.attendanceSettings,
-                      lateArrivalThresholdMins: Number(event.target.value) || 0,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
-              <FormField label="Attendance Auto Close Time" name="attendanceAutoCloseTime">
-                <input
-                  type="time"
-                  value={settings.attendanceSettings.attendanceAutoCloseTime}
-                  onChange={(event) =>
-                    setPartialSettings("attendanceSettings", {
-                      ...settings.attendanceSettings,
-                      attendanceAutoCloseTime: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
-
               <FormField label="Working Hours Start" name="workingHoursStart">
                 <input
                   type="time"
@@ -1377,112 +1160,6 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            id="preferences"
-            icon={Settings2}
-            title="User Preferences"
-            subtitle="Default dashboard behavior, localization, and display formats"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Default Dashboard" name="defaultDashboard">
-                <select
-                  value={settings.userPreferences.defaultDashboard}
-                  onChange={(event) =>
-                    setPartialSettings("userPreferences", {
-                      ...settings.userPreferences,
-                      defaultDashboard: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                >
-                  {defaultDashboardOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Default Language" name="defaultLanguage">
-                <select
-                  value={settings.userPreferences.defaultLanguage}
-                  onChange={(event) =>
-                    setPartialSettings("userPreferences", {
-                      ...settings.userPreferences,
-                      defaultLanguage: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                >
-                  {defaultLanguageOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Date Format" name="dateFormat">
-                <select
-                  value={settings.userPreferences.dateFormat}
-                  onChange={(event) =>
-                    setPartialSettings("userPreferences", {
-                      ...settings.userPreferences,
-                      dateFormat: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                >
-                  {dateFormatOptions.map((option) => (
-                    <option key={option} value={option} className="bg-slate-900 text-slate-100">
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Time Format" name="timeFormat">
-                <select
-                  value={settings.userPreferences.timeFormat}
-                  onChange={(event) =>
-                    setPartialSettings("userPreferences", {
-                      ...settings.userPreferences,
-                      timeFormat: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                >
-                  {timeFormatOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <div className="sm:col-span-2">
-                <FormField label="Timezone" name="timezone">
-                  <select
-                    value={settings.userPreferences.timezone}
-                    onChange={(event) =>
-                      setPartialSettings("userPreferences", {
-                        ...settings.userPreferences,
-                        timezone: event.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                  >
-                    {timezoneOptions.map((option) => (
-                      <option key={option} value={option} className="bg-slate-900 text-slate-100">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-              </div>
             </div>
           </SectionCard>
 

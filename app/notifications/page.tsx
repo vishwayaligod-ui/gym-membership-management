@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { Bell, Send, ClipboardList, CreditCard, Users, AlertCircle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 
 import { AppHeader } from "../components/AppHeader";
-import { BottomNavigation } from "../components/BottomNavigation";
 import { PageContainer } from "../components/PageContainer";
 
 import type { NotificationsResponse, Reminder, UpcomingRenewal, OverduePayment, RecentNotification } from "./types";
@@ -298,7 +297,6 @@ export default function NotificationsPage() {
         </div>
       </PageContainer>
 
-      <BottomNavigation />
     </div>
   );
 }

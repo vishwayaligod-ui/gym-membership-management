@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPrimaryGym, toSettingsPayload } from "../_utils";
 import { prisma } from "@/lib/prisma";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   try {
+    const access = await requireApiPermission("settings", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });

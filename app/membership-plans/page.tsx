@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Toaster, toast } from "sonner";
 import { type MembershipPlan, type PlanStatus, transformPlan, type ApiPlan } from "./types";
 import { PlansTable } from "@/components/membership-plans/PlansTable";
 import { Pagination } from "../components/v4/Pagination";
@@ -348,6 +349,10 @@ export default function MembershipPlansPage() {
     setDeleteTarget(plan);
   };
 
+  const handleEditRoute = (plan: MembershipPlan) => {
+    router.push(`/membership-plans/${plan.id}/edit`);
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -358,13 +363,20 @@ export default function MembershipPlansPage() {
 
       if (!res.ok) {
         const err = await res.json();
+        const message =
+          typeof err?.error === "string" && err.error.length > 0
+            ? err.error
+            : "Failed to delete plan";
+        toast.error(message);
         console.error("Failed to delete plan:", err);
         return;
       }
 
+      toast.success(`Plan "${deleteTarget.name}" deleted successfully`);
       setDeleteTarget(null);
       await fetchPlans();
     } catch (err) {
+      toast.error("Failed to delete plan. Please try again.");
       console.error("Failed to delete plan:", err);
     }
   };
@@ -378,7 +390,9 @@ export default function MembershipPlansPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="membership-plans-page flex min-w-0 flex-col space-y-6">
+      <Toaster position="top-right" richColors closeButton />
+
       {/* ═══════════════════════════════════════════
          PAGE HEADER
          ═══════════════════════════════════════════ */}
@@ -386,9 +400,9 @@ export default function MembershipPlansPage() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        className="flex w-full items-center justify-between gap-4 max-lg:flex-wrap"
       >
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
             Membership Plans
           </h1>
@@ -396,12 +410,12 @@ export default function MembershipPlansPage() {
             Manage gym membership plans, pricing and durations.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-full flex-none items-center justify-end sm:w-auto">
           <motion.button
             whileHover={{ y: -2, scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:from-emerald-500 hover:to-emerald-400 hover:shadow-emerald-500/30"
+            className="inline-flex w-full max-w-full flex-none items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:from-emerald-500 hover:to-emerald-400 hover:shadow-emerald-500/30 sm:w-auto"
             type="button"
           >
             <Plus className="h-4 w-4" />
@@ -644,13 +658,15 @@ export default function MembershipPlansPage() {
           ) : (
             <>
               <FadeUp delay={0.15}>
-                <PlansTable
-                  plans={paginatedPlans}
-                  onEdit={openEditModal}
-                  onDuplicate={handleDuplicate}
-                  onToggleStatus={handleToggleStatus}
-                  onDelete={handleDelete}
-                />
+                <div className="membership-plans-table-shell min-w-0">
+                  <PlansTable
+                    plans={paginatedPlans}
+                    onEdit={handleEditRoute}
+                    onDuplicate={handleDuplicate}
+                    onToggleStatus={handleToggleStatus}
+                    onDelete={handleDelete}
+                  />
+                </div>
               </FadeUp>
 
               <FadeUp delay={0.2}>
@@ -953,6 +969,91 @@ export default function MembershipPlansPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <style jsx global>{`
+        .membership-plans-page {
+          width: 100%;
+          min-width: 0;
+          overflow-x: hidden;
+        }
+
+        .membership-plans-table-shell {
+          width: 100%;
+          min-width: 0;
+        }
+
+        @media (min-width: 768px) {
+          .membership-plans-table-shell > div > div:first-child,
+          .membership-plans-table-shell > div > div:nth-child(2) > div {
+            grid-template-columns:
+              minmax(0, 1.6fr)
+              minmax(70px, 0.72fr)
+              minmax(74px, 0.76fr)
+              minmax(82px, 0.85fr)
+              minmax(68px, 0.7fr)
+              minmax(70px, 0.74fr)
+              minmax(64px, 0.68fr)
+              minmax(176px, 1.15fr) !important;
+            column-gap: 0.5rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+          }
+
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child {
+            min-width: 0;
+            justify-content: flex-end;
+          }
+
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child > div {
+            display: flex;
+            width: 100%;
+            min-width: 0;
+            max-width: 176px;
+            margin-left: auto;
+            align-items: stretch;
+            justify-content: flex-end;
+            gap: 0.5rem;
+          }
+
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child button {
+            min-width: 0;
+            justify-content: center;
+            white-space: nowrap;
+          }
+        }
+
+        @media (min-width: 768px) and (max-width: 1380px) {
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child > div {
+            flex-direction: column;
+          }
+        }
+
+        @media (min-width: 1381px) {
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child > div {
+            flex-direction: row;
+            flex-wrap: nowrap;
+          }
+        }
+
+        @media (min-width: 1600px) {
+          .membership-plans-table-shell > div > div:first-child,
+          .membership-plans-table-shell > div > div:nth-child(2) > div {
+            grid-template-columns:
+              minmax(0, 1.7fr)
+              minmax(78px, 0.78fr)
+              minmax(82px, 0.82fr)
+              minmax(92px, 0.92fr)
+              minmax(74px, 0.74fr)
+              minmax(78px, 0.8fr)
+              minmax(70px, 0.7fr)
+              minmax(188px, 1.18fr) !important;
+          }
+
+          .membership-plans-table-shell > div > div:nth-child(2) > div > div:last-child > div {
+            max-width: 188px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

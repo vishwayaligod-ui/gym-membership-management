@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, PaymentStatus, PaymentMode } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("renewals", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const membership = await prisma.membership.findUnique({
@@ -115,6 +121,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("renewals", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
     const body = await request.json();
 

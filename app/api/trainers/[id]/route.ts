@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { TrainerStatus } from "@/app/trainers/types";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 type TrainerRecord = {
   id: string;
@@ -69,6 +70,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("trainers", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const trainerProfile = await prisma.trainerProfile.findUnique({
@@ -135,6 +141,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("trainers", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -192,38 +203,34 @@ export async function PUT(
       return NextResponse.json({ error: "A trainer with this email already exists" }, { status: 409 });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: existing.user.id },
-        data: {
-          fullName: name,
-          email,
-          phone,
-          isActive: userIsActive,
-        },
-      });
+    await prisma.user.update({
+      where: { id: existing.user.id },
+      data: {
+        fullName: name,
+        email,
+        phone,
+        isActive: userIsActive,
+      },
+    });
 
-      const trainerProfile = await tx.trainerProfile.update({
-        where: { id },
-        data: {
-          specialization: specialization || DEFAULT_SPECIALIZATION,
-          experienceYears: Number.isFinite(experience) ? Math.max(0, experience) : 0,
-          isActive: profileIsActive,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              phone: true,
-              isActive: true,
-            },
+    const updated = await prisma.trainerProfile.update({
+      where: { id },
+      data: {
+        specialization: specialization || DEFAULT_SPECIALIZATION,
+        experienceYears: Number.isFinite(experience) ? Math.max(0, experience) : 0,
+        isActive: profileIsActive,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            isActive: true,
           },
         },
-      });
-
-      return trainerProfile;
+      },
     });
 
     const assignedMembers = await prisma.pTSession.groupBy({
@@ -272,6 +279,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("trainers", "delete");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const existing = await prisma.trainerProfile.findUnique({

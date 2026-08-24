@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PaymentStatus, PaymentMode, MembershipStatus } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   try {
+    const access = await requireApiPermission("payments", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
@@ -207,6 +213,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("payments", "create");
+    if (access.response) {
+      return access.response;
+    }
+
     const body = await request.json();
 
     const {

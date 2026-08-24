@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("membershipPlans", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const plan = await prisma.membershipPlan.findUnique({
@@ -34,6 +40,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("membershipPlans", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -109,15 +120,34 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return PUT(request, { params });
+}
+
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const access = await requireApiPermission("membershipPlans", "delete");
+    if (access.response) {
+      return access.response;
+    }
+
     const { id } = await params;
 
     const existing = await prisma.membershipPlan.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: {
+            memberships: true,
+          },
+        },
+      },
     });
 
     if (!existing) {
@@ -127,13 +157,20 @@ export async function DELETE(
       );
     }
 
-    // Soft delete since the model has isActive field
-    await prisma.membershipPlan.update({
+    if (existing._count.memberships > 0) {
+      return NextResponse.json(
+        {
+          error: "This plan is currently assigned to members. Remove or move active memberships before deleting this plan.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await prisma.membershipPlan.delete({
       where: { id },
-      data: { isActive: false },
     });
 
-    return NextResponse.json({ message: "Membership plan deactivated successfully" });
+    return NextResponse.json({ message: "Membership plan deleted successfully" });
   } catch (error) {
     console.error("Failed to delete membership plan:", error);
     return NextResponse.json(

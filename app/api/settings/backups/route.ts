@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { GymSettingsPayload } from "@/app/settings/types";
 import { getPrimaryGym, mapBackupItems, toPrismaSettingsUpdate, toSettingsPayload } from "../_utils";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 const createBackupSchema = z.object({
   label: z.string().trim().max(80).optional(),
@@ -14,6 +15,11 @@ const restoreBackupSchema = z.object({
 
 export async function GET() {
   try {
+    const access = await requireApiPermission("settings", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
@@ -43,6 +49,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("settings", "create");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
@@ -108,6 +119,11 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const access = await requireApiPermission("settings", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const gym = await getPrimaryGym();
     if (!gym) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
@@ -151,8 +167,6 @@ export async function PATCH(request: Request) {
           state: snapshot.gymInformation.state,
           country: snapshot.gymInformation.country,
           pincode: snapshot.gymInformation.pincode,
-          timezone: snapshot.userPreferences.timezone,
-          currency: snapshot.paymentSettings.currency,
         },
       });
 

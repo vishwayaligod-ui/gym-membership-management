@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, IndianRupee, Snowflake, Users, CalendarDays } from "lucide-react";
+import { IndianRupee, Snowflake, Users, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { type MembershipPlan } from "@/app/membership-plans/types";
 import { PlanStatusBadge } from "@/app/membership-plans/PlanStatusBadge";
@@ -16,14 +16,16 @@ type PlansTableProps = {
 
 export function PlansTable({ plans, onEdit, onDuplicate, onToggleStatus, onDelete }: PlansTableProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  void onDuplicate;
+  void onToggleStatus;
 
   if (plans.length === 0) return null;
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
       {/* Table Header */}
-      <div className="hidden md:grid md:grid-cols-[180px_120px_120px_130px_110px_120px_100px_80px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+      <div className="hidden md:grid md:grid-cols-[minmax(150px,1.35fr)_90px_90px_110px_90px_95px_80px_minmax(150px,1fr)] gap-2 border-b border-slate-700/60 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500 lg:grid-cols-[minmax(170px,1.35fr)_105px_105px_120px_95px_110px_90px_minmax(170px,1fr)] xl:grid-cols-[minmax(180px,1.35fr)_115px_115px_130px_100px_120px_100px_minmax(180px,1fr)]">
         <div>Plan Name</div>
         <div>Duration</div>
         <div>Joining Fee</div>
@@ -31,7 +33,7 @@ export function PlansTable({ plans, onEdit, onDuplicate, onToggleStatus, onDelet
         <div>Freeze Days</div>
         <div>Members Using</div>
         <div>Status</div>
-        <div />
+        <div className="text-right">Actions</div>
       </div>
 
       {/* Table Rows */}
@@ -44,7 +46,7 @@ export function PlansTable({ plans, onEdit, onDuplicate, onToggleStatus, onDelet
             transition={{ duration: 0.3, delay: idx * 0.03 }}
             onMouseEnter={() => setHoveredRow(plan.id)}
             onMouseLeave={() => setHoveredRow(null)}
-            className={`grid grid-cols-1 md:grid-cols-[180px_120px_120px_130px_110px_120px_100px_80px] gap-3 px-5 py-4 transition-all duration-200 ${
+            className={`grid grid-cols-1 md:grid-cols-[minmax(150px,1.35fr)_90px_90px_110px_90px_95px_80px_minmax(150px,1fr)] gap-2 px-4 py-4 transition-all duration-200 lg:grid-cols-[minmax(170px,1.35fr)_105px_105px_120px_95px_110px_90px_minmax(170px,1fr)] xl:grid-cols-[minmax(180px,1.35fr)_115px_115px_130px_100px_120px_100px_minmax(180px,1fr)] ${
               hoveredRow === plan.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
             }`}
           >
@@ -69,6 +71,34 @@ export function PlansTable({ plans, onEdit, onDuplicate, onToggleStatus, onDelet
                     <Snowflake className="h-3 w-3" />
                     {plan.freezeDays}d
                   </span>
+                </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    onClick={() => onEdit(plan)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700/40 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 transition-all hover:bg-slate-700/60"
+                    type="button"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => onDelete(plan)}
+                    disabled={plan.membersUsing > 0}
+                    title={
+                      plan.membersUsing > 0
+                        ? "Cannot delete a plan that is assigned to members"
+                        : "Delete plan"
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-all ${
+                      plan.membersUsing > 0
+                        ? "cursor-not-allowed border-slate-700 bg-slate-800/60 text-slate-500"
+                        : "border-red-800/50 bg-red-950/30 text-red-400 hover:bg-red-950/45"
+                    }`}
+                    type="button"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>
@@ -128,88 +158,35 @@ export function PlansTable({ plans, onEdit, onDuplicate, onToggleStatus, onDelet
             </div>
 
             {/* Actions */}
-            <div className="hidden md:flex items-center justify-end relative">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenMenuId(openMenuId === plan.id ? null : plan.id);
-                }}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
-                  hoveredRow === plan.id || openMenuId === plan.id
-                    ? "border-slate-600 bg-slate-700/50 text-slate-200 opacity-100"
-                    : "border-slate-700 bg-slate-800/50 text-slate-400 opacity-0 group-hover:opacity-100"
-                }`}
-                type="button"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </motion.button>
-
-              {openMenuId === plan.id && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                  transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-slate-700 bg-slate-800 shadow-xl shadow-black/30"
-                  onClick={(e) => e.stopPropagation()}
+            <div className="hidden md:flex items-center justify-end">
+              <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-end xl:flex-nowrap">
+                <button
+                  onClick={() => onEdit(plan)}
+                  className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-600 bg-slate-700/40 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 transition-all hover:bg-slate-700/60"
+                  type="button"
                 >
-                  <button
-                    onClick={() => {
-                      setOpenMenuId(null);
-                      onEdit(plan);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-slate-300 transition-colors hover:bg-slate-700/50 hover:text-slate-100"
-                    type="button"
-                  >
-                    <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpenMenuId(null);
-                      onDuplicate(plan);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-slate-300 transition-colors hover:bg-slate-700/50 hover:text-slate-100"
-                    type="button"
-                  >
-                    <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Duplicate
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpenMenuId(null);
-                      onToggleStatus(plan);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-slate-300 transition-colors hover:bg-slate-700/50 hover:text-slate-100"
-                    type="button"
-                  >
-                    <svg className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    {plan.status === "Active" ? "Deactivate" : "Activate"}
-                  </button>
-                  <div className="border-t border-slate-700/60" />
-                  <button
-                    onClick={() => {
-                      setOpenMenuId(null);
-                      onDelete(plan);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-400 transition-colors hover:bg-red-950/30"
-                    type="button"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete
-                  </button>
-                </motion.div>
-              )}
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDelete(plan)}
+                  disabled={plan.membersUsing > 0}
+                  title={
+                    plan.membersUsing > 0
+                      ? "Cannot delete a plan that is assigned to members"
+                      : "Delete plan"
+                  }
+                  className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-all ${
+                    plan.membersUsing > 0
+                      ? "cursor-not-allowed border-slate-700 bg-slate-800/60 text-slate-500"
+                      : "border-red-800/50 bg-red-950/30 text-red-400 hover:bg-red-950/45"
+                  }`}
+                  type="button"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
           </motion.div>
         ))}

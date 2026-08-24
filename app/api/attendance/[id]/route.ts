@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AttendanceStatus } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 const attendanceCheckoutSchema = z.object({
   checkOut: z.string().datetime().optional(),
@@ -11,6 +12,11 @@ const attendanceCheckoutSchema = z.object({
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const access = await requireApiPermission("attendance", "update");
+    if (access.response) {
+      return access.response;
+    }
+
     const session = await auth();
     const gymId = session?.user?.gymId ?? undefined;
     const branchId = session?.user?.branchId ?? undefined;

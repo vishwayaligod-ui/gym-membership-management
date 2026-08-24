@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   CalendarClock,
   Clock3,
@@ -9,24 +10,36 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { hasPermission, type PermissionResource } from "@/lib/permissions";
 
 type TabItem = {
   label: string;
   icon: typeof LayoutGrid;
   route: string;
+  resource?: PermissionResource;
 };
 
 const tabs: TabItem[] = [
-  { label: "Dashboard", icon: LayoutGrid, route: "/dashboard" },
-  { label: "Members", icon: Users, route: "/members-v4" },
-  { label: "Attendance", icon: Clock3, route: "/attendance" },
-  { label: "Renewals", icon: CalendarClock, route: "/renewals" },
-  { label: "Settings", icon: Settings, route: "/settings" },
+  { label: "Dashboard", icon: LayoutGrid, route: "/dashboard", resource: "dashboard" },
+  { label: "Members", icon: Users, route: "/members-v4", resource: "members" },
+  { label: "Attendance", icon: Clock3, route: "/attendance", resource: "attendance" },
+  { label: "Renewals", icon: CalendarClock, route: "/renewals", resource: "renewals" },
+  { label: "Settings", icon: Settings, route: "/settings", resource: "settings" },
 ];
 
 export function BottomNavigation() {
   const router = useRouter();
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+
+  const visibleTabs = tabs.filter((tab) => {
+    if (!tab.resource) {
+      return true;
+    }
+
+    return hasPermission(role, tab.resource, "read");
+  });
 
   const getActiveTab = () => {
     const path = pathname;
@@ -48,7 +61,7 @@ export function BottomNavigation() {
       className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85"
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-1 px-2 py-2 sm:px-4 lg:px-8">
-        {tabs.map((item) => {
+        {visibleTabs.map((item) => {
           const Icon = item.icon;
           const active = item.label === activeTab;
           return (

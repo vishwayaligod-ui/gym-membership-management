@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, PaymentStatus, PaymentMode } from "@prisma/client";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Fetch all memberships with their member and plan data
+    const access = await requireApiPermission("renewals", "read");
+    if (access.response) {
+      return access.response;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const memberId = searchParams.get("memberId") || "";
+
+    // Fetch memberships with their member and plan data
     const memberships = await prisma.membership.findMany({
+      where: memberId ? { memberId } : undefined,
       include: {
         member: {
           select: {
@@ -80,6 +90,7 @@ export async function GET() {
 
       return {
         id: membership.id,
+        memberId: member.id,
         name: `${member.firstName} ${member.lastName || ""}`.trim(),
         plan: plan.name,
         phone: member.phone,
@@ -124,6 +135,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("renewals", "create");
+    if (access.response) {
+      return access.response;
+    }
+
     const body = await request.json();
 
     const {

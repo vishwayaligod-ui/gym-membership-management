@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { MemberStatus } from "@prisma/client";
+import { MemberStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMemberStatus } from "@/app/lib/member-status";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 function startOfDay(date: Date) {
   const copy = new Date(date);
@@ -24,27 +25,37 @@ function formatTime(value: Date | null | undefined) {
 
 export async function GET(request: Request) {
   try {
+    const access = await requireApiPermission("attendance", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const session = await auth();
     const gymId = session?.user?.gymId ?? undefined;
     const branchId = session?.user?.branchId ?? undefined;
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() ?? "";
+    const searchWords = search.split(/\s+/).filter(Boolean);
     const now = new Date();
     const todayStart = startOfDay(now);
+
+    const searchFilter: Prisma.MemberWhereInput[] | undefined = searchWords.length
+      ? searchWords.map((word) => ({
+          OR: [
+            { firstName: { contains: word, mode: "insensitive" } },
+            { lastName: { contains: word, mode: "insensitive" } },
+            { phone: { contains: word } },
+            { memberCode: { contains: word, mode: "insensitive" } },
+          ],
+        }))
+      : undefined;
 
     const members = await prisma.member.findMany({
       where: {
         ...(gymId ? { gymId } : {}),
         ...(branchId ? { branchId } : {}),
-        OR: search
-          ? [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
-              { phone: { contains: search } },
-              { memberCode: { contains: search, mode: "insensitive" } },
-            ]
-          : undefined,
+        ...(searchFilter ? { AND: searchFilter } : {}),
       },
       include: {
         memberships: {

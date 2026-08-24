@@ -2,10 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Pencil, Repeat, Trash2, ChevronDown, Loader2 } from "lucide-react";
+import { Pencil, Repeat, Trash2, ChevronDown, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { type Member, planColors } from "@/app/members/types";
 import { StatusBadge } from "./StatusBadge";
+
+function formatINR(value: number): string {
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value).toString();
+  const [intPart, decPart] = abs.split(".");
+  const last3 = intPart.slice(-3);
+  const rest = intPart.slice(0, -3);
+  const groupedInt = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${last3}` : last3;
+  return `${sign}${groupedInt}${decPart ? `.${decPart}` : ""}`;
+}
 
 type MembersTableProps = {
   members: Member[];
@@ -20,9 +30,9 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
   if (members.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+    <div className="overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-800/40">
       {/* Table Header */}
-      <div className="hidden md:grid md:grid-cols-[56px_200px_140px_110px_110px_120px_120px_120px_80px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+      <div className="hidden md:grid md:grid-cols-[56px_120px_120px_100px_100px_110px_110px_120px_130px_70px] gap-3 border-b border-slate-700/60 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
         <div />
         <div>Member</div>
         <div>Phone</div>
@@ -30,6 +40,7 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
         <div>Join Date</div>
         <div>Expiry Date</div>
         <div>Status</div>
+        <div>Payment</div>
         <div>Actions</div>
         <div />
       </div>
@@ -48,7 +59,7 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
               onMouseEnter={() => setHoveredRow(member.id)}
               onMouseLeave={() => setHoveredRow(null)}
               onClick={() => router.push(`/members/${member.id}`)}
-              className={`grid grid-cols-1 md:grid-cols-[56px_200px_140px_110px_110px_120px_120px_120px_80px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
+              className={`grid grid-cols-1 md:grid-cols-[56px_120px_120px_100px_100px_110px_110px_120px_130px_70px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
                 hoveredRow === member.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
               }`}
             >
@@ -75,6 +86,11 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                       {member.plan}
                     </span>
                     <span className="text-[10px] text-slate-500 whitespace-nowrap">{member.joinedOn} → {member.expiresOn}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span className="text-[9px] text-blue-400/80">Discount: ₹{formatINR(member.discount)}</span>
+                    <span className="text-[9px] text-emerald-400/80">Paid: ₹{formatINR(member.amountPaid)}</span>
+                    <span className="text-[9px] text-amber-400/80">Due: ₹{formatINR(member.balanceDue)}</span>
                   </div>
                 </div>
               </div>
@@ -114,21 +130,17 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                 <StatusBadge status={member.status} />
               </div>
 
+              {/* Desktop: Payment */}
+              <div className="hidden md:flex items-center">
+                <div className="space-y-0.5">
+                  <p className="text-[13px] text-emerald-400/80">Paid: ₹{formatINR(member.amountPaid)}</p>
+                  <p className="text-[13px] text-amber-400/80">Due: ₹{formatINR(member.balanceDue)}</p>
+                  <p className="text-[13px] text-blue-400/80">Discount: ₹{formatINR(member.discount)}</p>
+                </div>
+              </div>
+
               {/* Desktop: Actions */}
               <div className="hidden md:flex items-center gap-1">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push(`/members/${member.id}`);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-all duration-200 ease-out hover:bg-blue-900/30 hover:text-blue-400"
-                  title="View"
-                  type="button"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}

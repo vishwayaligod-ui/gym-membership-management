@@ -158,7 +158,7 @@ export default function EditTrainerPage({ params }: { params: Promise<{ id: stri
       }
 
       toast.success("Trainer updated successfully");
-      router.push(`/trainers/${id}`);
+      router.push("/trainers");
       router.refresh();
     } catch (error) {
       console.error("Failed to update trainer:", error);

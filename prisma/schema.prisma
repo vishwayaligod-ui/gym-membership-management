@@ -169,6 +169,8 @@ model GymSettings {
   attendanceAutoCloseTime    String  @default("23:59")
 
   whatsappNotifications  Boolean @default(false)
+  whatsappEnabled        Boolean @default(false)
+  whatsappPhoneNumberId  String?
   smsNotifications       Boolean @default(false)
   emailNotifications     Boolean @default(true)
   renewalReminder        Boolean @default(true)
@@ -579,6 +581,8 @@ model DietPlan {
   protein  Int?
   carbs    Int?
   fat      Int?
+
+  content Json?
 
   startDate DateTime
   endDate   DateTime

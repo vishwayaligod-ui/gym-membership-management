@@ -23,31 +23,19 @@ export type GymSettingsPayload = {
     favicon: string;
   };
   membershipSettings: {
-    defaultMembershipDurationDays: number;
-    defaultFreezeDays: number;
-    allowMultipleActiveMemberships: boolean;
-    autoActivateMembership: boolean;
     membershipExpiryReminder: boolean;
     reminderBeforeDays: 1 | 3 | 7 | 15;
     gracePeriodAfterExpiryDays: number;
   };
   paymentSettings: {
-    currency: string;
-    currencySymbol: string;
-    taxPercentage: number;
-    lateFee: number;
-    receiptPrefix: string;
-    invoicePrefix: string;
     autoGenerateReceiptNumber: boolean;
   };
   attendanceSettings: {
     allowMultipleCheckIns: boolean;
-    lateArrivalThresholdMins: number;
     workingHoursStart: string;
     workingHoursEnd: string;
     checkInWindowStart: string;
     checkInWindowEnd: string;
-    attendanceAutoCloseTime: string;
   };
   notificationSettings: {
     whatsappNotifications: boolean;
@@ -57,13 +45,6 @@ export type GymSettingsPayload = {
     paymentReminder: boolean;
     birthdayWishes: boolean;
     attendanceReminder: boolean;
-  };
-  userPreferences: {
-    defaultDashboard: string;
-    defaultLanguage: string;
-    dateFormat: string;
-    timeFormat: string;
-    timezone: string;
   };
   security: {
     requirePasswordChange: boolean;
@@ -112,31 +93,19 @@ export const defaultGymSettings: GymSettingsPayload = {
     favicon: "",
   },
   membershipSettings: {
-    defaultMembershipDurationDays: 90,
-    defaultFreezeDays: 7,
-    allowMultipleActiveMemberships: false,
-    autoActivateMembership: true,
     membershipExpiryReminder: true,
     reminderBeforeDays: 7,
     gracePeriodAfterExpiryDays: 3,
   },
   paymentSettings: {
-    currency: "INR",
-    currencySymbol: "₹",
-    taxPercentage: 0,
-    lateFee: 0,
-    receiptPrefix: "RCPT",
-    invoicePrefix: "INV",
     autoGenerateReceiptNumber: true,
   },
   attendanceSettings: {
     allowMultipleCheckIns: false,
-    lateArrivalThresholdMins: 15,
     workingHoursStart: "06:00",
     workingHoursEnd: "22:00",
     checkInWindowStart: "05:30",
     checkInWindowEnd: "23:00",
-    attendanceAutoCloseTime: "23:59",
   },
   notificationSettings: {
     whatsappNotifications: false,
@@ -146,13 +115,6 @@ export const defaultGymSettings: GymSettingsPayload = {
     paymentReminder: true,
     birthdayWishes: false,
     attendanceReminder: false,
-  },
-  userPreferences: {
-    defaultDashboard: "overview",
-    defaultLanguage: "en",
-    dateFormat: "DD/MM/YYYY",
-    timeFormat: "24h",
-    timezone: "Asia/Kolkata",
   },
   security: {
     requirePasswordChange: false,

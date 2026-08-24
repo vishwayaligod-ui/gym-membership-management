@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PaymentStatus, MembershipStatus } from "@prisma/client";
 import { getMemberStatus } from "@/app/lib/member-status";
 import type { ActivityLog, InsightMessage, MemberExportRow } from "@/app/reports/types";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 function getDayName(date: Date): string {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -11,6 +12,11 @@ function getDayName(date: Date): string {
 
 export async function GET(request: Request) {
   try {
+    const access = await requireApiPermission("reports", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom") || "";
     const dateTo = searchParams.get("dateTo") || "";

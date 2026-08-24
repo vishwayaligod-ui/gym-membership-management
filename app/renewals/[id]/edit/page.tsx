@@ -9,7 +9,6 @@ import { useState, useMemo, use, useEffect } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { AppHeader } from "@/app/components/AppHeader";
-import { BottomNavigation } from "@/app/components/BottomNavigation";
 import { FormField } from "@/app/components/FormField";
 import { PageContainer } from "@/app/components/PageContainer";
 
@@ -531,7 +530,6 @@ export default function EditRenewalPage({ params }: { params: Promise<{ id: stri
         </motion.div>
       </PageContainer>
 
-      <BottomNavigation />
     </div>
   );
 }

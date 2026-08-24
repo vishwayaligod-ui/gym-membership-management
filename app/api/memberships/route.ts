@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   try {
+    const access = await requireApiPermission("memberships", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const { searchParams } = new URL(request.url);
     const memberId = searchParams.get("memberId") || "";
 

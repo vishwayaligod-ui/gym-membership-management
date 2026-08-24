@@ -41,6 +41,7 @@ type MemberData = {
     startDate: string;
     endDate: string;
     amount: number;
+    discount: number;
     finalAmount: number;
     status: string;
     plan: {
@@ -148,6 +149,9 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
   const totalSpent = member.payments?.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0) || 0;
   const planName = latestMembership?.plan?.name || "N/A";
   const planPrice = latestMembership?.plan?.price || 0;
+  const membershipDiscount = latestMembership?.discount || 0;
+  const finalFee = latestMembership?.finalAmount || planPrice;
+  const balanceDue = Math.max(0, finalFee - totalSpent);
   const joinedOn = new Date(member.joiningDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -223,7 +227,7 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200">
                   <IndianRupee className="h-3.5 w-3.5 text-slate-400" />
-                  ₹{totalSpent.toLocaleString("en-IN")}
+                  ₹{Number(totalSpent).toLocaleString("en-IN")}
                 </span>
               </div>
             </div>
@@ -272,7 +276,8 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 items-start">
+            <div className="space-y-4">
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -311,6 +316,94 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
               </div>
             </motion.section>
 
+
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut", delay: 0.06 }}
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+          >
+            <div className="mb-3.5 flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-blue-400" />
+              <h3 className="text-sm font-semibold text-slate-100">Recent Payment</h3>
+            </div>
+            {recentPayment ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Status</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {recentPayment.paymentStatus.charAt(0) + recentPayment.paymentStatus.slice(1).toLowerCase()}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {new Date(recentPayment.paymentDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Method</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {recentPayment.paymentMode === "CASH"
+                      ? "Cash"
+                      : recentPayment.paymentMode === "UPI"
+                      ? "UPI"
+                      : recentPayment.paymentMode === "CARD"
+                      ? "Card"
+                      : recentPayment.paymentMode === "BANK_TRANSFER"
+                      ? "Bank Transfer"
+                      : recentPayment.paymentMode}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Lifetime Amount Paid</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(totalSpent).toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Discount</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {membershipDiscount > 0 ? `₹${Number(membershipDiscount).toLocaleString("en-IN")}` : "₹0"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Balance Due</p>
+                  <p className={`mt-1 text-sm font-semibold ${balanceDue > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                    ₹{balanceDue.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Next Due Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{expiresOn}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-6">
+                <p className="text-sm text-slate-400">No payment records found</p>
+              </div>
+            )}
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut", delay: 0.12 }}
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
+          >
+            <div className="mb-3.5 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-blue-400" />
+              <h3 className="text-sm font-semibold text-slate-100">Notes</h3>
+            </div>
+            <p className="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-sm leading-6 text-slate-300">
+              {member.notes || "No notes"}
+            </p>
+          </motion.section>
+            </div>
+
+            <div className="space-y-4">
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -358,73 +451,27 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan Price</p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(planPrice).toLocaleString("en-IN")}</p>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 sm:col-span-2">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Membership Status</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-100">{displayStatus}</p>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Discount</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">
+                    {membershipDiscount > 0 ? `₹${Number(membershipDiscount).toLocaleString("en-IN")}` : "₹0"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Final Fee</p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-400">₹{Number(finalFee).toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Amount Paid</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(totalSpent).toLocaleString("en-IN")}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Balance Due</p>
+                  <p className={`mt-1 text-sm font-semibold ${balanceDue > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                    ₹{balanceDue.toLocaleString("en-IN")}
+                  </p>
                 </div>
               </div>
-            </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut", delay: 0.06 }}
-              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)]"
-            >
-              <div className="mb-3.5 flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-blue-400" />
-                <h3 className="text-sm font-semibold text-slate-100">Payment Summary</h3>
-              </div>
-              {recentPayment ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Latest Payment</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">₹{recentPayment.amount.toLocaleString("en-IN")}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Status</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">
-                      {recentPayment.paymentStatus.charAt(0) + recentPayment.paymentStatus.slice(1).toLowerCase()}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Date</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">
-                      {new Date(recentPayment.paymentDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Payment Method</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">
-                      {recentPayment.paymentMode === "CASH"
-                        ? "Cash"
-                        : recentPayment.paymentMode === "UPI"
-                        ? "UPI"
-                        : recentPayment.paymentMode === "CARD"
-                        ? "Card"
-                        : recentPayment.paymentMode === "BANK_TRANSFER"
-                        ? "Bank Transfer"
-                        : recentPayment.paymentMode}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Lifetime Amount Paid</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">₹{totalSpent.toLocaleString("en-IN")}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Next Due Date</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">{expiresOn}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-6">
-                  <p className="text-sm text-slate-400">No payment records found</p>
-                </div>
-              )}
             </motion.section>
 
             <motion.section
@@ -437,7 +484,7 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
                 <Clock className="h-4 w-4 text-blue-400" />
                 <h3 className="text-sm font-semibold text-slate-100">Membership Summary</h3>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Days Remaining</p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">{daysRemaining} Days</p>
@@ -456,33 +503,19 @@ export default function MemberDetailsPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Lifetime Amount Paid</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{totalSpent.toLocaleString("en-IN")}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(totalSpent).toLocaleString("en-IN")}</p>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Trainer</p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">Not assigned</p>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 sm:col-span-2">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 sm:col-span-2 lg:col-span-2">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Plan Price</p>
                   <p className="mt-1 text-sm font-semibold text-slate-100">₹{Number(planPrice).toLocaleString("en-IN")}</p>
                 </div>
               </div>
             </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut", delay: 0.12 }}
-              className="rounded-2xl border border-slate-800 bg-slate-900 p-3.5 shadow-[0_12px_36px_rgba(2,6,23,0.28)] lg:col-span-2"
-            >
-              <div className="mb-3.5 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-blue-400" />
-                <h3 className="text-sm font-semibold text-slate-100">Notes</h3>
-              </div>
-              <p className="rounded-xl border border-slate-800 bg-slate-950 px-2.5 py-2 text-sm leading-6 text-slate-300">
-                {member.notes || "No notes"}
-              </p>
-            </motion.section>
+            </div>
           </div>
         </motion.div>
       </motion.div>

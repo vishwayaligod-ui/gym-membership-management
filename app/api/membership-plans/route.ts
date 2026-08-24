@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireApiPermission } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
+    const access = await requireApiPermission("membershipPlans", "read");
+    if (access.response) {
+      return access.response;
+    }
+
     const plans = await prisma.membershipPlan.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -24,6 +30,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("membershipPlans", "create");
+    if (access.response) {
+      return access.response;
+    }
+
     const body = await request.json();
 
     const { name, durationInDays, price, joiningFee, freezeDays, description, isActive } = body;

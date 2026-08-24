@@ -16,6 +16,9 @@ export type Member = {
   lifetimeRevenue: number;
   visits: number;
   mtd: number;
+  discount: number;
+  amountPaid: number;
+  balanceDue: number;
 };
 
 export type MembersKPIs = {

@@ -38,10 +38,12 @@ const schema = z.object({
     .optional()
     .or(z.literal("")),
   gender: z.string().min(1, "Select a gender"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z
+    .string()
+    .optional()
+    .or(z.literal("")),
   address: z
     .string()
-    .min(5, "Address must be at least 5 characters")
     .max(500, "Address is too long")
     .optional()
     .or(z.literal("")),
@@ -66,6 +68,60 @@ const schema = z.object({
     .max(1000, "Notes must be under 1000 characters")
     .optional()
     .or(z.literal("")),
+  discount: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((val) => {
+      if (!val) return true;
+      return /^\d+(\.\d{1,2})?$/.test(val);
+    }, "Enter a valid discount amount"),
+  amountPaid: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((val) => {
+      if (!val) return true;
+      return /^\d+(\.\d{1,2})?$/.test(val);
+    }, "Enter a valid amount"),
+}).superRefine((data, ctx) => {
+  const fee = parseFloat(data.membershipFee || "0") || 0;
+  const discount = parseFloat(data.discount || "0") || 0;
+  const finalFee = fee - discount;
+
+  if (discount < 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["discount"],
+      message: "Discount cannot be negative",
+    });
+  }
+
+  if (discount > fee) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["discount"],
+      message: "Discount cannot exceed membership fee",
+    });
+  }
+
+  const amountPaid = parseFloat(data.amountPaid || "0") || 0;
+
+  if (amountPaid < 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["amountPaid"],
+      message: "Amount paid cannot be negative",
+    });
+  }
+
+  if (amountPaid > finalFee) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["amountPaid"],
+      message: "Amount paid cannot exceed final fee",
+    });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -85,6 +141,8 @@ const defaultValues: FormValues = {
   paymentMethod: "Cash",
   photo: "",
   notes: "",
+  discount: "",
+  amountPaid: "",
 };
 
 function calculateExpiryDate(joiningDate: string, durationInDays: number): string {
@@ -116,6 +174,16 @@ export default function AddMemberPage() {
 
   const selectedPlanId = watch("membershipPlanId");
   const joiningDate = watch("joiningDate");
+  const membershipFee = watch("membershipFee");
+  const discount = watch("discount");
+  const amountPaid = watch("amountPaid");
+
+  // Compute final fee and balance due
+  const feeValue = parseFloat(membershipFee || "0") || 0;
+  const discountValue = parseFloat(discount || "0") || 0;
+  const finalFee = Math.max(0, feeValue - discountValue);
+  const paidValue = parseFloat(amountPaid || "0") || 0;
+  const balanceDue = Math.max(0, finalFee - paidValue);
 
   // Track form dirty state
   useEffect(() => {
@@ -308,7 +376,7 @@ export default function AddMemberPage() {
                   </select>
                 </FormField>
 
-                <FormField label="Date of Birth" name="dateOfBirth" required error={errors.dateOfBirth?.message}>
+                <FormField label="Date of Birth" name="dateOfBirth" error={errors.dateOfBirth?.message}>
                   <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
                     <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-500" />
                     <input
@@ -447,6 +515,66 @@ export default function AddMemberPage() {
                   ) : null}
                 </FormField>
 
+                <FormField label="Discount (₹)" name="discount" hint="Optional fixed rupee discount" error={errors.discount?.message}>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                    <input
+                      id="discount"
+                      type="text"
+                      inputMode="decimal"
+                      {...register("discount")}
+                      className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
+                      placeholder="0"
+                      tabIndex={11}
+                    />
+                  </div>
+                </FormField>
+
+                <FormField label="Final Fee (₹)" name="finalFee">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
+                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                    <input
+                      id="finalFee"
+                      type="text"
+                      value={finalFee > 0 ? finalFee.toLocaleString("en-IN") : ""}
+                      readOnly
+                      className="w-full border-none bg-transparent text-sm font-semibold text-emerald-400 outline-none"
+                      placeholder="Auto-calculated"
+                      tabIndex={-1}
+                    />
+                  </div>
+                </FormField>
+
+                <FormField label="Amount Paid (₹)" name="amountPaid" hint="Amount collected at joining" error={errors.amountPaid?.message}>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                    <input
+                      id="amountPaid"
+                      type="text"
+                      inputMode="decimal"
+                      {...register("amountPaid")}
+                      className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
+                      placeholder="0"
+                      tabIndex={12}
+                    />
+                  </div>
+                </FormField>
+
+                <FormField label="Balance Due (₹)" name="balanceDue">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
+                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                    <input
+                      id="balanceDue"
+                      type="text"
+                      value={balanceDue > 0 ? balanceDue.toLocaleString("en-IN") : ""}
+                      readOnly
+                      className="w-full border-none bg-transparent text-sm font-semibold text-amber-400 outline-none"
+                      placeholder="Auto-calculated"
+                      tabIndex={-1}
+                    />
+                  </div>
+                </FormField>
+
                 <FormField label="Payment Method" name="paymentMethod" required error={errors.paymentMethod?.message}>
                   <select
                     id="paymentMethod"
@@ -470,7 +598,7 @@ export default function AddMemberPage() {
                         {...register("notes")}
                         className="min-h-[90px] w-full resize-none border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
                         placeholder="Training preferences, package notes, and follow-up reminders"
-                        tabIndex={11}
+                        tabIndex={13}
                       />
                     </div>
                   </FormField>
@@ -490,7 +618,7 @@ export default function AddMemberPage() {
                   router.back();
                 }}
                 className="min-h-12 flex-1 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200 active:bg-slate-700 sm:flex-none sm:px-6"
-                tabIndex={13}
+                tabIndex={15}
               >
                 Cancel
               </button>
@@ -499,7 +627,7 @@ export default function AddMemberPage() {
                 form="add-member-form"
                 disabled={isSubmitting}
                 className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:from-emerald-500 hover:to-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-6"
-                tabIndex={12}
+                tabIndex={14}
               >
                 {isSubmitting ? (
                   <>

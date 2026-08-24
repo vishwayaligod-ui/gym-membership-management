@@ -27,8 +27,15 @@ const schema = z.object({
   mobileNumber: z.string().min(10, "Mobile number should be at least 10 digits"),
   emailAddress: z.string().email("Enter a valid email address").optional().or(z.literal("")),
   gender: z.string().min(1, "Select a gender"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
-  address: z.string().min(5, "Address is required"),
+  dateOfBirth: z
+    .string()
+    .optional()
+    .or(z.literal("")),
+  address: z
+    .string()
+    .max(500, "Address is too long")
+    .optional()
+    .or(z.literal("")),
   emergencyContact: z.string().min(10, "Emergency contact is required"),
   membershipPlanId: z.string().min(1, "Select a plan"),
   joiningDate: z.string().min(1, "Joining date is required"),
@@ -167,7 +174,7 @@ export default function EditMemberPage({ params }: { params: Promise<{ id: strin
       }
 
       toast.success("Member updated successfully");
-      router.push(`/members/${id}`);
+      router.push("/members");
     } catch (error) {
       console.error("Error saving member:", error);
       toast.error("Failed to update member. Please check your connection.");
@@ -288,7 +295,7 @@ export default function EditMemberPage({ params }: { params: Promise<{ id: strin
               </select>
             </FormField>
 
-            <FormField label="Date of Birth" name="dateOfBirth" required error={errors.dateOfBirth?.message}>
+            <FormField label="Date of Birth" name="dateOfBirth" error={errors.dateOfBirth?.message}>
               <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
                 <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-500" />
                 <input
@@ -313,7 +320,7 @@ export default function EditMemberPage({ params }: { params: Promise<{ id: strin
             </FormField>
 
             <div className="md:col-span-2">
-              <FormField label="Address" name="address" required error={errors.address?.message}>
+              <FormField label="Address" name="address" error={errors.address?.message}>
                 <div className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
                   <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
                   <textarea

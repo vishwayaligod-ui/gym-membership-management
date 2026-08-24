@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useGymBranding } from "@/app/components/useGymBranding";
 import {
   UserCheck,
   IndianRupee,
@@ -101,6 +102,7 @@ type DashboardData = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { gymName } = useGymBranding();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#3B82F6]" />
+          <Loader2 className="h-10 w-10 animate-spin text-[var(--primary)]" />
           <p className="text-sm font-medium text-[#64748B]">Loading dashboard...</p>
         </div>
       </div>
@@ -197,7 +199,7 @@ export default function DashboardPage() {
           <p className="text-xs text-[#64748B]">{error || "No data available"}</p>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-lg bg-[#3B82F6]/10 px-4 py-2 text-xs font-semibold text-[#3B82F6] hover:bg-[#3B82F6]/20 transition-colors"
+            className="rounded-lg bg-[var(--primary)]/10 px-4 py-2 text-xs font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/20 transition-colors"
           >
             Retry
           </button>
@@ -335,11 +337,15 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/90 via-blue-700/80 to-indigo-800/90 px-8 py-5 shadow-lg shadow-blue-900/20"
+        className="relative overflow-hidden rounded-2xl px-8 py-5 shadow-lg shadow-[var(--primary)]/20"
+        style={{
+          background:
+            "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
+        }}
       >
         {/* Decorative blurred circles */}
         <div className="pointer-events-none absolute -top-12 -right-12 h-52 w-52 rounded-full bg-white/5 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-indigo-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-[var(--primary)]/10 blur-3xl" />
 
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           {/* LEFT — greeting + identity */}
@@ -348,13 +354,13 @@ export default function DashboardPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
           >
-            <p className="text-sm font-semibold tracking-wide text-blue-200 uppercase">
+            <p className="text-sm font-semibold tracking-wide text-white/80 uppercase">
               {greeting}
             </p>
             <h1 className="mt-2 text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">
-              Elite Fitness Studio
+              {gymName || "Gym"}
             </h1>
-            <p className="mt-2 text-sm text-blue-200">{dateString}</p>
+            <p className="mt-2 text-sm text-white/80">{dateString}</p>
             <p className="mt-3 text-base font-medium text-white/70">
               &ldquo;Let's build stronger members today.&rdquo;
             </p>
@@ -377,9 +383,9 @@ export default function DashboardPage() {
                   whileHover={{ y: -3 }}
                   className="flex min-w-[110px] flex-col gap-1.5 rounded-xl bg-white/10 border border-white/10 px-4 py-3 hover:bg-white/15 transition-colors"
                 >
-                  <Icon className="h-5 w-5 text-blue-200" />
+                  <Icon className="h-5 w-5 text-white/80" />
                   <p className="text-xl font-bold text-white">{stat.value}</p>
-                  <p className="text-xs font-medium text-blue-200 leading-tight">{stat.label}</p>
+                  <p className="text-xs font-medium text-white/80 leading-tight">{stat.label}</p>
                 </motion.div>
               );
             })}
@@ -403,10 +409,10 @@ export default function DashboardPage() {
               className="group rounded-xl border border-[#334155] bg-[#1E293B] p-5 text-left shadow-sm transition-all hover:border-[#475569] hover:bg-[#273449] hover:shadow-md sm:p-6"
             >
               <div className="flex items-center justify-between">
-                <div className="rounded-xl bg-[#3B82F6]/10 p-3 ring-1 ring-[#3B82F6]/20">
-                  <Icon className="h-6 w-6 text-[#3B82F6]" />
+                <div className="rounded-xl bg-[var(--primary)]/10 p-3 ring-1 ring-[var(--primary)]/20">
+                  <Icon className="h-6 w-6 text-[var(--primary)]" />
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#64748B] opacity-0 transition-all group-hover:opacity-100 group-hover:text-[#3B82F6]" />
+                <ArrowRight className="h-4 w-4 text-[#64748B] opacity-0 transition-all group-hover:opacity-100 group-hover:text-[var(--primary)]" />
               </div>
               <p className="mt-5 text-base font-bold leading-tight text-[#F8FAFC]">{action.label}</p>
               <p className="mt-1 text-xs font-medium text-[#64748B]">{action.subtitle}</p>
@@ -431,7 +437,7 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={() => router.push("/renewals")}
-              className="flex items-center gap-1 rounded-lg bg-[#3B82F6]/10 px-3 py-1.5 text-xs font-semibold text-[#3B82F6] hover:bg-[#3B82F6]/20 transition-colors"
+              className="flex items-center gap-1 rounded-lg bg-[var(--primary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/20 transition-colors"
             >
               View All
               <ArrowRight className="h-3 w-3" />
@@ -468,7 +474,7 @@ export default function DashboardPage() {
                     whileHover={{ y: -2, transition: { duration: 0.15 } }}
                     className="flex items-center gap-3 rounded-xl border border-[#334155]/60 bg-[#0F172A]/50 p-3 transition-all hover:bg-[#273449]"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3B82F6] text-xs font-bold text-white shadow-sm">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white shadow-sm">
                       {renewal.avatar}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -567,15 +573,15 @@ export default function DashboardPage() {
         >
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-[#3B82F6]/10 p-1.5">
-                <Activity className="h-4 w-4 text-[#3B82F6]" />
+              <div className="rounded-lg bg-[var(--primary)]/10 p-1.5">
+                <Activity className="h-4 w-4 text-[var(--primary)]" />
               </div>
               <div>
                 <p className="text-base font-bold text-[#F8FAFC]">Today's Attendance</p>
                 <p className="text-xs text-[#64748B] mt-0.5">Peak hours breakdown</p>
               </div>
             </div>
-            <span className="rounded-lg bg-[#3B82F6] px-2.5 py-1 text-[10px] font-bold text-white">
+            <span className="rounded-lg bg-[var(--primary)] px-2.5 py-1 text-[10px] font-bold text-white">
               {stats.todayCheckIns} total
             </span>
           </div>
@@ -604,7 +610,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="text-xs font-bold text-[#F8FAFC]">{item.count}</p>
-                        <span className="text-[10px] font-semibold text-[#3B82F6] bg-[#3B82F6]/10 px-1.5 py-0.5 rounded-md">
+                        <span className="text-[10px] font-semibold text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded-md">
                           {item.percentage}%
                         </span>
                       </div>
@@ -614,7 +620,7 @@ export default function DashboardPage() {
                         initial={{ width: 0 }}
                         animate={{ width: `${item.percentage}%` }}
                         transition={{ duration: 0.7, delay: 0.4 + idx * 0.06 }}
-                        className={`h-full rounded-full ${isPeak ? "bg-[#3B82F6]" : "bg-[#3B82F6]/60"}`}
+                        className={`h-full rounded-full ${isPeak ? "bg-[var(--primary)]" : "bg-[var(--primary)]/60"}`}
                       />
                     </div>
                   </motion.div>
@@ -664,7 +670,7 @@ export default function DashboardPage() {
                   whileHover={{ x: 3, transition: { duration: 0.15 } }}
                   className="flex items-center gap-3 rounded-xl border border-[#334155]/60 bg-[#0F172A]/50 p-3 transition-all hover:bg-[#273449]"
                 >
-                  <div className="h-8 w-1.5 shrink-0 rounded-full bg-[#3B82F6]" />
+                  <div className="h-8 w-1.5 shrink-0 rounded-full bg-[var(--primary)]" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#94A3B8] truncate">{item.category}</p>
                   </div>
@@ -754,8 +760,8 @@ export default function DashboardPage() {
       >
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-[#3B82F6]/10 p-1.5">
-              <TrendingUp className="h-4 w-4 text-[#3B82F6]" />
+            <div className="rounded-lg bg-[var(--primary)]/10 p-1.5">
+              <TrendingUp className="h-4 w-4 text-[var(--primary)]" />
             </div>
             <div>
               <p className="text-base font-bold text-[#F8FAFC]">Quick Insights</p>
@@ -904,13 +910,13 @@ export default function DashboardPage() {
                     <div
                       className={`w-full rounded-t-md transition-all duration-300 ${
                         isCurrentMonth
-                          ? "bg-gradient-to-t from-[#3B82F6] to-[#60A5FA]"
-                          : "bg-[#3B82F6]/40 hover:bg-[#3B82F6]/60"
+                          ? "bg-gradient-to-t from-[var(--primary)] to-[var(--primary-light)]"
+                          : "bg-[var(--primary)]/40 hover:bg-[var(--primary)]/60"
                       }`}
                       style={{ height: "100%" }}
                     />
                     <span className={`text-[9px] font-semibold truncate max-w-full ${
-                      isCurrentMonth ? "text-[#3B82F6]" : "text-[#64748B]"
+                      isCurrentMonth ? "text-[var(--primary)]" : "text-[#64748B]"
                     }`}>
                       {item.label}
                     </span>

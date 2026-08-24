@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import {
   Plus,
   Search,
@@ -18,9 +19,9 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Toaster, toast } from "sonner";
+import { exportRowsToExcel, getExportDateStamp } from "@/lib/export/exportExcel";
 import { type MemberStatus, type Member, type MembersKPIs, planColors } from "./types";
 import { MembersTable } from "../components/v4/MembersTable";
-import { QuickPanel } from "../components/v4/QuickPanel";
 import { Pagination } from "../components/v4/Pagination";
 import { StatusBadge } from "../components/v4/StatusBadge";
 import { FadeUp } from "../components/v4/MotionDiv";
@@ -45,6 +46,8 @@ const sortOptions = [
 
 export default function MembersPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "All">("All");
   const [planFilter, setPlanFilter] = useState("All");
@@ -138,6 +141,136 @@ export default function MembersPage() {
     }
   };
 
+  const handleImportFile = async (file: File) => {
+    try {
+      setIsImporting(true);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) {
+        toast.error("The file does not contain any sheets.");
+        return;
+      }
+      const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+
+      if (jsonRows.length === 0) {
+        toast.error("The file does not contain any data rows.");
+        return;
+      }
+
+      const rows = jsonRows.map((r) => {
+        // Combine separate First Name / Last Name columns if present.
+        const firstName = String(r["First Name"] ?? r["firstName"] ?? "").trim();
+        const lastName = String(r["Last Name"] ?? r["lastName"] ?? "").trim();
+        const fullNameFromParts = [firstName, lastName].filter(Boolean).join(" ").trim();
+        const fullNameFromColumn = String(
+          r["Full Name"] ?? r["fullName"] ?? r["Name of Member"] ?? ""
+        ).trim();
+        const fullName = fullNameFromParts || fullNameFromColumn;
+
+        // Pick the first non-empty value from the candidate source columns.
+        const pickValue = (...keys: string[]): string | number => {
+          for (const key of keys) {
+            const v = r[key];
+            if (v !== "" && v != null) {
+              return typeof v === "number" ? v : String(v);
+            }
+          }
+          return "";
+        };
+
+        return {
+          fullName,
+          mobileNumber: String(pickValue("Mobile Number", "mobileNumber", "Contact")).trim(),
+          emailAddress: String(pickValue("Email Address", "emailAddress")).trim(),
+          gender: String(pickValue("Gender", "gender")).trim(),
+          dateOfBirth: String(pickValue("Date of Birth", "dateOfBirth")).trim(),
+          address: String(pickValue("Address", "address")).trim(),
+          emergencyContact: String(pickValue("Emergency Contact", "emergencyContact")).trim(),
+          membershipPlan: String(pickValue("Membership Plan", "membershipPlan")).trim(),
+          planPrice: pickValue("Our Package", "planPrice"),
+          planDuration: String(pickValue("Duration", "planDuration")).trim(),
+          joiningDate: String(pickValue("Joining Date", "joiningDate", "Payment - Start Date")).trim(),
+          expiryDate: String(pickValue("Expiry Date", "expiryDate", "Payment - Date of Expiry")).trim(),
+          membershipFee: pickValue("Membership Fee", "membershipFee", "Payment - Paid"),
+          paymentRemaining: String(pickValue("Payment - Remaining", "paymentRemaining")).trim(),
+          paymentMethod: String(pickValue("Payment Method", "paymentMethod")).trim(),
+          notes: String(pickValue("Notes", "notes")).trim(),
+        };
+      });
+
+      const response = await fetch("/api/members/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to import members");
+      }
+
+      if (data.skipped?.length > 0) {
+        const skippedSummary = data.skipped
+          .slice(0, 5)
+          .map((s: { row: number; reason: string }) => `Row ${s.row}: ${s.reason}`)
+          .join("\n");
+        const remaining = data.skipped.length - 5;
+        toast.warning(
+          `${data.message}\n\n${skippedSummary}${remaining > 0 ? `\n...and ${remaining} more` : ""}`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success(data.message || "Members imported successfully");
+      }
+
+      fetchMembers();
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Failed to import members:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to import members");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImportButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleExport = () => {
+    const rows = members.map((member) => ({
+      "Member ID": member.id,
+      Name: member.name,
+      Username: member.username,
+      Phone: member.phone,
+      Email: member.email,
+      Plan: member.plan,
+      Gender: member.gender,
+      "Join Date": member.joinedOn,
+      "Expiry Date": member.expiresOn,
+      Status: member.status,
+      "Visits": member.visits,
+      "MTD": member.mtd,
+      "Lifetime Revenue": member.lifetimeRevenue,
+    }));
+
+    const exported = exportRowsToExcel(
+      rows,
+      "Members",
+      `Members_Export_${getExportDateStamp()}`
+    );
+
+    if (exported) {
+      toast.success("Members exported successfully");
+    } else {
+      toast.error("No member data available to export.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" richColors closeButton />
@@ -172,6 +305,7 @@ export default function MembersPage() {
           <motion.button
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.98 }}
+            onClick={handleExport}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-[12px] font-semibold text-slate-400 transition-all hover:border-slate-600 hover:text-slate-200"
             type="button"
           >
@@ -181,12 +315,29 @@ export default function MembersPage() {
           <motion.button
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.98 }}
+            onClick={handleImportButtonClick}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-[12px] font-semibold text-slate-400 transition-all hover:border-slate-600 hover:text-slate-200"
             type="button"
           >
-            <Upload className="h-3.5 w-3.5" />
+            {isImporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
             Import
           </motion.button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleImportFile(file);
+              }
+            }}
+          />
         </div>
       </motion.div>
 
@@ -431,11 +582,9 @@ export default function MembersPage() {
       </FadeUp>
 
       {/* ═══════════════════════════════════════════
-         MAIN CONTENT: TABLE + QUICK PANEL
+         MAIN CONTENT: TABLE
          ═══════════════════════════════════════════ */}
-      <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Table Section */}
-        <div className="flex-1 min-w-0 space-y-4">
+      <div className="space-y-4">
           {isLoading ? (
             <FadeUp delay={0.15}>
               <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
@@ -494,12 +643,6 @@ export default function MembersPage() {
               </FadeUp>
             </>
           )}
-        </div>
-
-        {/* Quick Panel */}
-        <div className="hidden lg:block">
-          <QuickPanel members={members} />
-        </div>
       </div>
     </div>
   );

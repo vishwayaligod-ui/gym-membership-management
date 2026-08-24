@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma";
 import { Gender, PaymentMode, PaymentStatus, MembershipStatus, MemberStatus } from "@prisma/client";
-import { getMemberStatus } from "@/app/lib/member-status";
+import { getMemberStatus } from "../../lib/member-status";
 
 export async function GET(request: Request) {
   try {
@@ -60,6 +60,11 @@ export async function GET(request: Request) {
           orderBy: { startDate: "desc" },
           take: 1,
         },
+        payments: {
+          select: {
+            amount: true,
+          },
+        },
         _count: {
           select: {
             attendances: true,
@@ -93,6 +98,12 @@ export async function GET(request: Request) {
       // Calculate avatar initials
       const initials = `${member.firstName.charAt(0)}${member.lastName?.charAt(0) || ""}`;
 
+      // Payment calculations (mirrors Member Details page logic)
+      const totalPaid = member.payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const discount = Number(latestMembership?.discount || 0);
+      const finalAmount = Number(latestMembership?.finalAmount || 0);
+      const balanceDue = Math.max(0, finalAmount - totalPaid);
+
       return {
         id: member.id,
         name: `${member.firstName} ${member.lastName || ""}`.trim(),
@@ -117,6 +128,9 @@ export async function GET(request: Request) {
         lifetimeRevenue: 0,
         visits: member._count.attendances,
         mtd: 0,
+        discount,
+        amountPaid: totalPaid,
+        balanceDue,
       };
     });
 
