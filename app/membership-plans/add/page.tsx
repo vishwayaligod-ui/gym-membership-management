@@ -140,11 +140,11 @@ export default function AddMembershipPlanPage() {
       {/* Form */}
       <FadeUp delay={0.1}>
         <form onSubmit={handleSubmit}>
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-6 sm:p-8">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-8">
+            <div className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-2 sm:gap-6">
               {/* Plan Name */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                   Plan Name <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -164,9 +164,9 @@ export default function AddMembershipPlanPage() {
                 )}
               </div>
 
-              {/* Duration */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              {/* Duration (Days) */}
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                   Duration (Days) <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -187,9 +187,32 @@ export default function AddMembershipPlanPage() {
                 )}
               </div>
 
+              {/* Joining Fee */}
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                  Joining Fee (₹)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formData.joiningFee}
+                  onChange={(e) => updateField("joiningFee", e.target.value)}
+                  placeholder="e.g. 500"
+                  className={`w-full rounded-lg border bg-slate-900/50 px-4 py-3 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:bg-slate-900/80 focus:ring-1 ${
+                    errors.joiningFee
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
+                      : "border-slate-700 focus:border-emerald-500 focus:ring-emerald-500/30"
+                  }`}
+                />
+                {errors.joiningFee && (
+                  <p className="text-[11px] text-red-400">{errors.joiningFee}</p>
+                )}
+              </div>
+
               {/* Membership Fee */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                   Membership Fee (₹) <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -211,32 +234,9 @@ export default function AddMembershipPlanPage() {
                 )}
               </div>
 
-              {/* Joining Fee */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-                  Joining Fee (₹)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={formData.joiningFee}
-                  onChange={(e) => updateField("joiningFee", e.target.value)}
-                  placeholder="e.g. 500"
-                  className={`w-full rounded-lg border bg-slate-900/50 px-4 py-3 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:bg-slate-900/80 focus:ring-1 ${
-                    errors.joiningFee
-                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/30"
-                      : "border-slate-700 focus:border-emerald-500 focus:ring-emerald-500/30"
-                  }`}
-                />
-                {errors.joiningFee && (
-                  <p className="text-[11px] text-red-400">{errors.joiningFee}</p>
-                )}
-              </div>
-
               {/* Freeze Days */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                   Freeze Days
                 </label>
                 <input
@@ -257,8 +257,8 @@ export default function AddMembershipPlanPage() {
               </div>
 
               {/* Status */}
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+              <div className="min-w-0 space-y-1.5">
+                <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                   Status
                 </label>
                 <select
@@ -271,19 +271,20 @@ export default function AddMembershipPlanPage() {
                 </select>
               </div>
 
-              {/* Description */}
-              <div className="sm:col-span-2 space-y-1.5">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => updateField("description", e.target.value)}
-                  placeholder="Describe what this plan includes, benefits, and any special features..."
-                  rows={3}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-3 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30 resize-none"
-                />
-              </div>
+            </div>
+
+            {/* Description (full width, outside the two-column grid) */}
+            <div className="mt-6 min-w-0 space-y-1.5">
+              <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => updateField("description", e.target.value)}
+                placeholder="Describe what this plan includes, benefits, and any special features..."
+                rows={3}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-3 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30 resize-none"
+              />
             </div>
 
             {/* Action Buttons */}
