@@ -15,6 +15,7 @@ import {
   Globe,
   ImagePlus,
   Loader2,
+  Menu,
   Palette,
   Receipt,
   RefreshCcw,
@@ -27,7 +28,6 @@ import { Toaster, toast } from "sonner";
 import { FormField } from "@/app/components/FormField";
 import {
   cloneDefaultGymSettings,
-  defaultGymSettings,
   type GymSettingsPayload,
   type SettingsBackupItem,
   type SettingsPageResponse,
@@ -93,15 +93,25 @@ function SectionCard({
   title,
   subtitle,
   children,
+  active = true,
 }: {
   id: string;
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  active?: boolean;
 }) {
   return (
-    <section id={id} className="rounded-2xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+    <section
+      id={id}
+      className={cn(
+        "rounded-2xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5",
+        // Mobile shows one section at a time (selected via the hamburger menu);
+        // desktop keeps every section stacked below the side navigation.
+        active ? "block" : "hidden lg:block"
+      )}
+    >
       <div className="mb-4 flex items-center gap-2.5">
         <div className="rounded-lg bg-blue-900/30 p-2 text-blue-300">
           <Icon className="h-4 w-4" />
@@ -190,8 +200,10 @@ function validateSettings(settings: GymSettingsPayload): FieldErrors {
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState(settingsSections[0].id);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [settings, setSettings] = useState<GymSettingsPayload>(cloneDefaultGymSettings());
@@ -203,6 +215,7 @@ export default function SettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const brandingLogoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(settings) !== JSON.stringify(initialSettings);
@@ -222,6 +235,7 @@ export default function SettingsPage() {
       setBackups(payload.backups ?? []);
       setSelectedBackupId(payload.backups?.[0]?.id ?? "");
       setFieldErrors({});
+      setSaveStatus("idle");
     } catch (error) {
       console.error("Failed to load settings:", error);
       toast.error("Unable to load settings");
@@ -231,7 +245,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchSettings();
+    // Defer the first synchronous setState (setLoading(true)) out of the effect
+    // body to satisfy react-hooks/set-state-in-effect; behavior is unchanged
+    // because loading already starts as true.
+    void Promise.resolve().then(fetchSettings);
   }, [fetchSettings]);
 
   useEffect(() => {
@@ -256,11 +273,30 @@ export default function SettingsPage() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // Close the mobile section menu when tapping/clicking outside of it.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [mobileMenuOpen]);
+
   const setPartialSettings = <K extends keyof GymSettingsPayload>(
     section: K,
     value: GymSettingsPayload[K]
   ) => {
     setSettings((prev) => ({ ...prev, [section]: value }));
+    setSaveStatus("idle");
   };
 
   const handleImageUpload = async (
@@ -312,6 +348,7 @@ export default function SettingsPage() {
       });
 
       toast.success("Image uploaded and preview updated");
+      setSaveStatus("idle");
     } catch (error) {
       console.error("Failed to upload image:", error);
       toast.error("Failed to process selected image");
@@ -356,7 +393,9 @@ export default function SettingsPage() {
       }
 
       toast.success("Settings saved successfully");
+      setSaveStatus("saved");
     } catch (error) {
+      setSaveStatus("error");
       toast.error(error instanceof Error ? error.message : "Failed to save settings");
     } finally {
       setSaving(false);
@@ -371,6 +410,7 @@ export default function SettingsPage() {
 
     setSettings(cloneDefaultGymSettings());
     setFieldErrors({});
+    setSaveStatus("idle");
     toast.info("Default values loaded. Click Save All Settings to persist.");
   };
 
@@ -401,6 +441,7 @@ export default function SettingsPage() {
           lastBackupAt: new Date().toISOString(),
         },
       }));
+      setSaveStatus("idle");
       toast.success(payload.message || "Backup created successfully");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create backup");
@@ -442,6 +483,7 @@ export default function SettingsPage() {
       if (payload.settings) {
         setSettings(payload.settings);
         setInitialSettings(payload.settings);
+        setSaveStatus("idle");
       }
       if (payload.backups) {
         setBackups(payload.backups);
@@ -495,9 +537,34 @@ export default function SettingsPage() {
 
   const gymLogoPreview = settings.gymInformation.gymLogo || settings.branding.gymLogo;
   const faviconPreview = settings.branding.favicon;
+  const activeSectionLabel = settingsSections.find((section) => section.id === activeSection)?.label ?? "";
+  const saveStatusMessage = saving
+    ? "Saving your settings..."
+    : saveStatus === "saved"
+      ? "Settings saved successfully."
+      : saveStatus === "error"
+        ? "Save failed. Review the highlighted fields and try again."
+        : hasUnsavedChanges
+          ? "Unsaved changes detected. Save now to persist your gym configuration."
+          : "All settings are up to date.";
+  const saveStatusColor = saving
+    ? "text-slate-300"
+    : saveStatus === "saved"
+      ? "text-emerald-400"
+      : saveStatus === "error"
+        ? "text-rose-400"
+        : "text-slate-400";
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6 pb-[calc(env(safe-area-inset-bottom)+4rem)] lg:pb-0"
+      // Mobile (<lg): reserve bottom clearance so the last Settings field and the
+      // in-flow Save bar can always scroll fully above the app's fixed BottomNavigation
+      // (~4.3rem tall incl. padding) plus the iPhone safe-area inset and breathing room.
+      // The 4rem baseline guarantees clearance even where env() is 0 (default viewport),
+      // while env(safe-area-inset-bottom) adds more where the browser exposes it.
+      // Desktop (lg+): no fixed bottom navigation, keep the existing layout untouched.
+    >
       <Toaster position="top-right" richColors closeButton />
 
       <motion.div
@@ -539,9 +606,64 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
+      {/*
+        Mobile section navigation — compact hamburger/menu selector. Tapping it opens a
+        scrollable, viewport-bounded list of every settings section; the active section is
+        highlighted and selecting one applies it and closes the menu.
+      */}
+      <div ref={mobileMenuRef} className="relative lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="settings-section-menu"
+          className="flex w-full items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-left shadow-sm"
+        >
+          <Menu className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="text-sm font-semibold text-slate-200">Settings</span>
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-blue-900/50 bg-blue-900/20 px-2.5 py-1 text-xs font-semibold text-blue-300">
+            {activeSectionLabel}
+          </span>
+        </button>
+
+        {mobileMenuOpen && (
+          <div
+            id="settings-section-menu"
+            className="absolute inset-x-0 top-full z-30 mt-2 max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-2 shadow-2xl shadow-black/40"
+          >
+            {settingsSections.map((section) => {
+              const Icon = section.icon;
+              const active = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveSection(section.id);
+                    setMobileMenuOpen(false);
+                    window.location.hash = section.id;
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
+                    active
+                      ? "bg-blue-900/25 text-blue-300"
+                      : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 truncate">{section.label}</span>
+                  {active && <Check className="h-4 w-4 shrink-0 text-blue-400" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
-          <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+        {/* Desktop/tablet side navigation — vertical, no horizontal overflow */}
+        <aside className="hidden rounded-2xl border border-slate-800 bg-slate-900 p-3 lg:block">
+          <div className="flex flex-col gap-1">
             {settingsSections.map((section) => {
               const Icon = section.icon;
               const active = activeSection === section.id;
@@ -555,14 +677,14 @@ export default function SettingsPage() {
                     document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                    "flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition",
                     active
                       ? "border-blue-500/40 bg-blue-900/20 text-blue-300"
                       : "border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {section.label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{section.label}</span>
                 </button>
               );
             })}
@@ -573,34 +695,39 @@ export default function SettingsPage() {
           <SectionCard
             id="gym-info"
             icon={Building2}
+            active={activeSection === "gym-info"}
             title="Gym Information"
             subtitle="Business identity, contact details, location, and primary operating hours"
           >
             <div className="mb-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-3">
-                <p className="mb-2 text-xs font-medium text-slate-500">Gym Logo Preview</p>
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
-                  {gymLogoPreview ? (
-                    <img src={gymLogoPreview} alt="Gym logo" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-semibold">No Logo</span>
-                  )}
+                <p className="mb-2 hidden text-xs font-medium text-slate-500 sm:block">Gym Logo Preview</p>
+                {/* Mobile: compact single row — square logo preview on the left, Upload Logo
+                    filling the remaining width. sm+: unchanged stacked preview + button layout. */}
+                <div className="flex items-center gap-3 sm:block sm:space-y-3">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
+                    {gymLogoPreview ? (
+                      <img src={gymLogoPreview} alt="Gym logo" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-semibold">No Logo</span>
+                    )}
+                  </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon"
+                    onChange={(event) => handleImageUpload(event, "gymLogo")}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-600"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    Upload Logo
+                  </button>
                 </div>
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon"
-                  onChange={(event) => handleImageUpload(event, "gymLogo")}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => logoInputRef.current?.click()}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-600"
-                >
-                  <ImagePlus className="h-3.5 w-3.5" />
-                  Upload Logo
-                </button>
               </div>
 
               <div className="rounded-xl border border-slate-700 bg-slate-950/80 p-3">
@@ -622,7 +749,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* Mobile: short fields pair into two columns; desktop (sm+) keeps the exact
+                previous 2-column grid and gaps (sm:gap-4 / sm:grid-cols-2). */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-2 sm:gap-4">
               <FormField label="Gym Name" name="gymName" required error={fieldErrors["gymInformation.gymName"]}>
                 <input
                   value={settings.gymInformation.gymName}
@@ -676,22 +805,25 @@ export default function SettingsPage() {
                 />
               </FormField>
 
-              <FormField
-                label="Alternate Phone"
-                name="alternatePhone"
-                error={fieldErrors["gymInformation.alternatePhone"]}
-              >
-                <input
-                  value={settings.gymInformation.alternatePhone}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      alternatePhone: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              {/* Mobile: full-width row for readability; desktop (sm+) keeps its single grid column */}
+              <div className="col-span-2 sm:col-span-1">
+                <FormField
+                  label="Alternate Phone"
+                  name="alternatePhone"
+                  error={fieldErrors["gymInformation.alternatePhone"]}
+                >
+                  <input
+                    value={settings.gymInformation.alternatePhone}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        alternatePhone: event.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
               <FormField label="Pincode" name="pincode" required error={fieldErrors["gymInformation.pincode"]}>
                 <input
@@ -706,7 +838,9 @@ export default function SettingsPage() {
                 />
               </FormField>
 
-              <div className="sm:col-span-2">
+              {/* Mobile: long field stays full width, placed after the Pincode/City pair;
+                  desktop (sm+) order restored to the previous DOM order via order-none */}
+              <div className="col-span-2 order-2 sm:order-none">
                 <FormField label="Address" name="address" required error={fieldErrors["gymInformation.address"]}>
                   <textarea
                     value={settings.gymInformation.address}
@@ -721,73 +855,87 @@ export default function SettingsPage() {
                 </FormField>
               </div>
 
-              <FormField label="City" name="city" required error={fieldErrors["gymInformation.city"]}>
-                <input
-                  value={settings.gymInformation.city}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      city: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              {/* Mobile: pairs with Pincode (moved up beside it); desktop (sm+) order untouched */}
+              <div className="order-1 sm:order-none">
+                <FormField label="City" name="city" required error={fieldErrors["gymInformation.city"]}>
+                  <input
+                    value={settings.gymInformation.city}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        city: event.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
-              <FormField label="State" name="state" required error={fieldErrors["gymInformation.state"]}>
-                <input
-                  value={settings.gymInformation.state}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      state: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              {/* Mobile: State + Country pair; desktop (sm+) order untouched */}
+              <div className="order-3 sm:order-none">
+                <FormField label="State" name="state" required error={fieldErrors["gymInformation.state"]}>
+                  <input
+                    value={settings.gymInformation.state}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        state: event.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
-              <FormField label="Country" name="country" required error={fieldErrors["gymInformation.country"]}>
-                <input
-                  value={settings.gymInformation.country}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      country: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              <div className="order-3 sm:order-none">
+                <FormField label="Country" name="country" required error={fieldErrors["gymInformation.country"]}>
+                  <input
+                    value={settings.gymInformation.country}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        country: event.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
-              <FormField label="GST Number" name="gst" error={fieldErrors["gymInformation.gstNumber"]}>
-                <input
-                  value={settings.gymInformation.gstNumber}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      gstNumber: event.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm uppercase text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              {/* Mobile: full-width row (no compatible short partner); desktop (sm+) keeps single column */}
+              <div className="col-span-2 order-4 sm:order-none sm:col-span-1">
+                <FormField label="GST Number" name="gst" error={fieldErrors["gymInformation.gstNumber"]}>
+                  <input
+                    value={settings.gymInformation.gstNumber}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        gstNumber: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm uppercase text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
-              <FormField label="Website" name="website" error={fieldErrors["gymInformation.website"]}>
-                <input
-                  value={settings.gymInformation.website}
-                  onChange={(event) =>
-                    setPartialSettings("gymInformation", {
-                      ...settings.gymInformation,
-                      website: event.target.value,
-                    })
-                  }
-                  placeholder="https://example.com"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
-                />
-              </FormField>
+              {/* Mobile: full-width long URL field; desktop (sm+) keeps single column */}
+              <div className="col-span-2 order-5 sm:order-none sm:col-span-1">
+                <FormField label="Website" name="website" error={fieldErrors["gymInformation.website"]}>
+                  <input
+                    value={settings.gymInformation.website}
+                    onChange={(event) =>
+                      setPartialSettings("gymInformation", {
+                        ...settings.gymInformation,
+                        website: event.target.value,
+                      })
+                    }
+                    placeholder="https://example.com"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </FormField>
+              </div>
 
-              <div className="sm:col-span-2">
+              <div className="col-span-2 order-6 sm:order-none">
                 <FormField
                   label="Google Business Profile URL"
                   name="googleBusinessProfileUrl"
@@ -812,6 +960,7 @@ export default function SettingsPage() {
           <SectionCard
             id="branding"
             icon={Palette}
+            active={activeSection === "branding"}
             title="Branding"
             subtitle="Primary and secondary colors, white-label visuals, logo, and favicon"
           >
@@ -933,6 +1082,7 @@ export default function SettingsPage() {
           <SectionCard
             id="membership"
             icon={Users}
+            active={activeSection === "membership"}
             title="Membership Settings"
             subtitle="Lifecycle controls and expiry automation"
           >
@@ -996,6 +1146,7 @@ export default function SettingsPage() {
           <SectionCard
             id="payments"
             icon={Receipt}
+            active={activeSection === "payments"}
             title="Payment Settings"
             subtitle="Receipt number strategy"
           >
@@ -1020,6 +1171,7 @@ export default function SettingsPage() {
           <SectionCard
             id="attendance"
             icon={Clock3}
+            active={activeSection === "attendance"}
             title="Attendance Settings"
             subtitle="Check-in rules, hours, and window controls"
           >
@@ -1102,6 +1254,7 @@ export default function SettingsPage() {
           <SectionCard
             id="notifications"
             icon={Bell}
+            active={activeSection === "notifications"}
             title="Notification Settings"
             subtitle="Select channel and trigger preferences for automated communication"
           >
@@ -1166,6 +1319,7 @@ export default function SettingsPage() {
           <SectionCard
             id="security"
             icon={Shield}
+            active={activeSection === "security"}
             title="Security"
             subtitle="Session lifecycle, access hardening, and login tracking behavior"
           >
@@ -1244,6 +1398,7 @@ export default function SettingsPage() {
           <SectionCard
             id="backup"
             icon={Database}
+            active={activeSection === "backup"}
             title="Backup"
             subtitle="Create and restore settings snapshots, export configuration, and database data"
           >
@@ -1328,13 +1483,14 @@ export default function SettingsPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky bottom-4 z-20 rounded-2xl border border-slate-700/70 bg-slate-900/90 p-3 shadow-[0_16px_40px_rgba(2,6,23,0.45)] backdrop-blur"
+        // In-flow on mobile (<lg) so it can never cover the active section's content,
+        // with an env() inset keeping it clear of the iPhone home bar / fixed bottom nav.
+        // Desktop (lg+) keeps the previous always-visible sticky save bar behavior.
+        className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_16px_40px_rgba(2,6,23,0.45)] backdrop-blur lg:sticky lg:bottom-4 lg:z-20 lg:pb-3"
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-400">
-            {hasUnsavedChanges
-              ? "Unsaved changes detected. Save now to persist your gym configuration."
-              : "All settings are up to date."}
+          <p className={cn("text-xs", saveStatusColor)}>
+            {saveStatusMessage}
           </p>
           <div className="flex items-center gap-2">
             <button

@@ -21,7 +21,7 @@ type TabItem = {
 
 const tabs: TabItem[] = [
   { label: "Dashboard", icon: LayoutGrid, route: "/dashboard", resource: "dashboard" },
-  { label: "Members", icon: Users, route: "/members-v4", resource: "members" },
+  { label: "Members", icon: Users, route: "/members", resource: "members" },
   { label: "Attendance", icon: Clock3, route: "/attendance", resource: "attendance" },
   { label: "Renewals", icon: CalendarClock, route: "/renewals", resource: "renewals" },
   { label: "Settings", icon: Settings, route: "/settings", resource: "settings" },
@@ -44,7 +44,7 @@ export function BottomNavigation() {
   const getActiveTab = () => {
     const path = pathname;
     if (path === "/dashboard" || path === "/") return "Dashboard";
-    if (path === "/members-v4" || path.startsWith("/members-v4/")) return "Members";
+    if (path === "/members" || path.startsWith("/members/")) return "Members";
     if (path.includes("/attendance")) return "Attendance";
     if (path.includes("/renewals")) return "Renewals";
     if (path.includes("/settings")) return "Settings";

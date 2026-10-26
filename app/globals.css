@@ -34,6 +34,11 @@
 html {
   height: 100%;
   overflow: hidden;
+  /* Stop the document itself from rubber-banding on touch devices: a drag that
+     starts on a non-scrollable area (e.g. the global header) must never slide the
+     app shell — and the sticky header with it — off the top of the mobile viewport.
+     Ignored gracefully where unsupported (normal scrolling is unaffected). */
+  overscroll-behavior: none;
 }
 
 body {

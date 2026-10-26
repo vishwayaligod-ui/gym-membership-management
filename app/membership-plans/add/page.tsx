@@ -141,7 +141,17 @@ export default function AddMembershipPlanPage() {
       <FadeUp delay={0.1}>
         <form onSubmit={handleSubmit}>
           <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-8">
-            <div className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-2 sm:gap-6">
+            {/* Mobile grid fix: the base `.grid-cols-2` utility has been served with an EMPTY
+                declaration (Turbopack writing .next while `next build`/`next dev` share the
+                tree, then cached by phones under a stable asset name). With `display: grid`
+                but no `grid-template-columns`, CSS Grid auto-places into ONE column on
+                <640px viewports, while desktop keeps working via `sm:grid-cols-2` inside the
+                intact @media rule. Inline styles live in the HTML document, so they cannot be
+                emptied by the corrupted CSS asset. All HEAD classes are preserved unchanged. */}
+            <div
+              className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-2 sm:gap-6"
+              style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+            >
               {/* Plan Name */}
               <div className="min-w-0 space-y-1.5">
                 <label className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">

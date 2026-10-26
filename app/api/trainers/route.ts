@@ -137,6 +137,13 @@ export async function POST(request: Request) {
       return access.response;
     }
 
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from the request body and never from a database lookup
+    // (e.g. prisma.gym.findFirst()), which is non-deterministic in a
+    // multi-gym database and could attach the trainer to the wrong gym.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+
     const body = await request.json();
 
     const name = (body.name as string | undefined)?.trim();
@@ -167,16 +174,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const gym = await prisma.gym.findFirst();
-    if (!gym) {
+    // Tenant must be known before any write. Require the session gymId and
+    // never fall back to gym table lookups to resolve the current tenant.
+    if (!gymId) {
       return NextResponse.json(
-        { error: "No gym found. Please set up your gym first." },
+        { error: "No gym assigned to your account. Please contact an administrator." },
         { status: 400 }
       );
     }
 
     const branch = await prisma.branch.findFirst({
-      where: { gymId: gym.id, isActive: true },
+      where: { gymId, isActive: true },
     });
 
     const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
@@ -187,7 +195,7 @@ export async function POST(request: Request) {
     const created = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          gymId: gym.id,
+          gymId,
           branchId: branch?.id ?? null,
           fullName: name,
           email,
@@ -200,7 +208,7 @@ export async function POST(request: Request) {
 
       const trainerProfile = await tx.trainerProfile.create({
         data: {
-          gymId: gym.id,
+          gymId,
           userId: user.id,
           specialization: specialization || DEFAULT_SPECIALIZATION,
           experienceYears: Number.isFinite(experience) ? Math.max(0, experience) : 0,

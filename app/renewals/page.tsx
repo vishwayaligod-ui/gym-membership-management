@@ -136,6 +136,71 @@ function RenewalCard({ renewal, onRenew }: { renewal: RenewalMember; onRenew: (r
   );
 }
 
+// Mobile-only compact row for the renewal task list (below md). Presentation
+// only — reuses the same status derivation and navigation routes as the desktop
+// RenewalCard so behavior is identical on every breakpoint.
+function MobileRenewalRow({ renewal, onRenew }: { renewal: RenewalMember; onRenew: (route: string) => void }) {
+  const isExpired = renewal.daysRemaining < 0;
+  const statusDisplay = getRenewalStatusDisplay(renewal.daysRemaining);
+  const StatusIcon = statusDisplay.icon;
+
+  return (
+    <div
+      className={`flex items-center gap-3 px-3.5 py-3 transition-colors active:bg-slate-700/30 ${
+        isExpired ? "border-l-2 border-red-400/60" : "border-l-2 border-transparent"
+      }`}
+    >
+      {/* Member initials */}
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[12px] font-bold text-white shadow-sm shadow-blue-900/30">
+        {renewal.avatar}
+      </div>
+
+      {/* Name · plan · status + expiry/amount meta */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold leading-snug text-slate-100">
+          {renewal.name}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-slate-500">
+          <span className="truncate">{renewal.plan}</span>
+          <span aria-hidden="true">•</span>
+          <span
+            className={`flex shrink-0 items-center gap-1 font-semibold ${
+              isExpired ? "text-red-400" : statusDisplay.color
+            }`}
+          >
+            <StatusIcon className="h-3 w-3" />
+            {statusDisplay.label}
+          </span>
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+          <span className="font-semibold text-slate-300">₹{renewal.fee.toLocaleString()}</span>
+          {" · "}
+          Expires {renewal.expiryDate}
+        </p>
+      </div>
+
+      {/* Primary action — same routes as the desktop card */}
+      <button
+        type="button"
+        onClick={() =>
+          onRenew(
+            isExpired
+              ? `/renewals/${renewal.id}`
+              : `/renewals/add?memberId=${renewal.memberId}`
+          )
+        }
+        className={`h-9 shrink-0 rounded-lg px-3.5 text-[12px] font-semibold transition-all active:scale-95 ${
+          isExpired
+            ? "border border-slate-700 text-slate-400 hover:border-blue-500/40 hover:text-blue-400"
+            : "bg-blue-600 text-white shadow-sm shadow-blue-600/25 hover:bg-blue-700"
+        }`}
+      >
+        {isExpired ? "View Details" : "Renew"}
+      </button>
+    </div>
+  );
+}
+
 function RenewalsDashboard() {
   const router = useRouter();
   // Date is formatted only after mount to avoid hydration mismatches
@@ -196,6 +261,18 @@ function RenewalsDashboard() {
       });
   }, [searchQuery, activeFilter, renewals]);
 
+  // Mobile-only compact counts for the filter chips (replaces the large KPI
+  // stat cards below md). Derived from the same stats payload — no logic change.
+  // "all" mirrors the existing categorizeRenewal behavior, where only renewals
+  // expiring within 30 days (or expired) are ever shown under "All".
+  const mobileFilterCounts: Record<FilterType, number> = {
+    all: stats.today + stats.soon + stats.upcoming + stats.expired,
+    today: stats.today,
+    "7days": stats.soon,
+    "30days": stats.upcoming,
+    expired: stats.expired,
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -207,7 +284,92 @@ function RenewalsDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div>
+      {/* ═══════════════════════════════════════════
+         MOBILE (below md): compact receptionist renewal task list
+         SEARCH → FILTER CHIPS (with counts) → RENEWAL LIST
+         ═══════════════════════════════════════════ */}
+      <div className="space-y-4 md:hidden">
+        {/* Compact page header */}
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight text-slate-100">
+            Membership Renewals
+          </h1>
+          <p className="mt-0.5 text-[11px] text-slate-500">{todayDate}</p>
+        </div>
+
+        {/* Compact search — same searchQuery state as desktop */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search name, plan, or phone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search renewals"
+            className="h-10 w-full rounded-xl border border-slate-700/70 bg-slate-800/50 pl-9 pr-3 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-colors focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+          />
+        </div>
+
+        {/* Compact filter chips with counts (replaces the large stat cards) */}
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {filterOptions.map((option) => {
+            const isActive = activeFilter === option.value;
+            const isExpiredChip = option.value === "expired";
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setActiveFilter(option.value)}
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                    : "border border-slate-700/70 bg-slate-800/50 text-slate-400"
+                }`}
+              >
+                {option.label}
+                <span
+                  className={`rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums ${
+                    isActive
+                      ? "bg-white/20 text-white"
+                      : isExpiredChip && stats.expired > 0
+                      ? "bg-red-900/30 text-red-400"
+                      : "bg-slate-700/50 text-slate-400"
+                  }`}
+                >
+                  {mobileFilterCounts[option.value]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Renewal task list */}
+        {filteredRenewals.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+            <div className="divide-y divide-slate-700/40">
+              {filteredRenewals.map((renewal) => (
+                <MobileRenewalRow key={renewal.id} renewal={renewal} onRenew={handleRenew} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-700/40">
+              <AlertCircle className="h-5 w-5 text-slate-500" />
+            </div>
+            <p className="mt-3 text-[15px] font-semibold text-slate-300">No renewals found</p>
+            <p className="mt-1 text-[13px] text-slate-500">
+              {searchQuery ? "Try adjusting your search" : "Try selecting a different filter"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         TABLET/DESKTOP (md and up): existing layout — unchanged
+         ═══════════════════════════════════════════ */}
+      <div className="hidden md:block space-y-6">
       {/* ═══════════════════════════════════════════
           PAGE HEADER — Renewals
           ═══════════════════════════════════════════ */}
@@ -379,6 +541,7 @@ function RenewalsDashboard() {
             </motion.div>
           )}
         </motion.div>
+      </div>
       </div>
     </div>
   );

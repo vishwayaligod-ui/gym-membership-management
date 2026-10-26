@@ -5,10 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   CalendarCheck,
-  Eye,
-  Edit3,
-  Phone,
-  MessageCircle,
+  Check,
   Search,
   Timer,
   UserCheck,
@@ -53,6 +50,15 @@ export default function AttendancePage() {
     new Date().toLocaleDateString("en-US", {
       weekday: "long",
       month: "short",
+      day: "numeric",
+    })
+  );
+  // Compact mobile header date ("Monday, September 7") — also formatted after
+  // mount to avoid hydration mismatches (see useMountedDateString).
+  const todayMobileDate = useMountedDateString(() =>
+    new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
       day: "numeric",
     })
   );
@@ -225,9 +231,133 @@ export default function AttendancePage() {
 
   const checkedInCount = records.length;
   const checkedOutCount = records.filter((r) => r.checkOut !== "—").length;
+  const activeNowCount = checkedInCount - checkedOutCount;
+  // Members currently inside the gym — derived from today's records (no extra API call).
+  const activeRecords = records.filter((r) => r.checkIn !== "—" && r.checkOut === "—");
 
   return (
     <div className="text-[#F8FAFC]">
+      {/* ═══════════════════════════════════════════
+          MOBILE (below md) — Receptionist operational layout
+          SEARCH MEMBER → SELECT MEMBER → CHECK IN / CHECK OUT
+          ═══════════════════════════════════════════ */}
+      <div className="space-y-5 md:hidden">
+        {/* Compact page header — no giant hero on mobile */}
+        <FadeUp>
+          <header>
+            <h1 className="text-[22px] font-bold tracking-tight text-[#F8FAFC]">
+              Attendance
+            </h1>
+            <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+              Today
+            </p>
+            <p className="text-[13px] font-medium text-[#94A3B8]">{todayMobileDate}</p>
+          </header>
+        </FadeUp>
+
+        {/* QUICK CHECK-IN — search → select → check in (first action on screen) */}
+        <FadeUp delay={0.05}>
+          <section aria-label="Quick check-in">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+              Quick Check-In
+            </p>
+            <QuickCheckInCard
+              variant="mobile"
+              members={checkInMembers}
+              searchQuery={checkInSearch}
+              onSearchChange={setCheckInSearch}
+              selectedMember={selectedMember}
+              onSelectMember={setSelectedMember}
+              onCheckIn={handleCheckIn}
+              onCheckOut={handleCheckOut}
+              isSubmitting={isSubmitting}
+            />
+          </section>
+        </FadeUp>
+
+        {/* TODAY — compact counts, not oversized dashboard cards */}
+        <FadeUp delay={0.1}>
+          <section aria-label="Today's summary">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+              Today
+            </p>
+            <div className="grid grid-cols-3 divide-x divide-[#334155]/60 rounded-2xl border border-[#334155] bg-[#1E293B] py-3">
+              <div className="px-2 text-center">
+                <p className="text-[18px] font-bold tabular-nums leading-tight text-[#F8FAFC]">
+                  {checkedInCount}
+                </p>
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                  Checked In
+                </p>
+              </div>
+              <div className="px-2 text-center">
+                <p className="text-[18px] font-bold tabular-nums leading-tight text-[#F8FAFC]">
+                  {checkedOutCount}
+                </p>
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                  Checked Out
+                </p>
+              </div>
+              <div className="px-2 text-center">
+                <p className="text-[18px] font-bold tabular-nums leading-tight text-[#3B82F6]">
+                  {activeNowCount}
+                </p>
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
+                  Active Now
+                </p>
+              </div>
+            </div>
+          </section>
+        </FadeUp>
+
+        {/* CURRENTLY IN GYM — ✓ Checked In state per active member (display only, no checkout) */}
+        <FadeUp delay={0.15}>
+          <section aria-label="Currently in gym">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+              Currently In Gym
+            </p>
+            <div className="overflow-hidden rounded-2xl border border-[#334155] bg-[#1E293B]">
+              {isLoading ? (
+                <p className="px-4 py-8 text-center text-[13px] text-[#64748B]">Loading...</p>
+              ) : activeRecords.length === 0 ? (
+                <p className="px-4 py-8 text-center text-[13px] text-[#64748B]">
+                  No members checked in
+                </p>
+              ) : (
+                <div className="divide-y divide-[#334155]/50">
+                  {activeRecords.map((record) => (
+                    <div key={record.id} className="flex items-center gap-3 px-3.5 py-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 text-[12px] font-bold text-white shadow-sm">
+                        {record.avatar}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[14px] font-semibold text-[#F8FAFC]">
+                          {record.name}
+                        </p>
+                        <p className="tabular-nums text-[12px] text-[#64748B]">
+                          Checked in {record.checkIn}
+                        </p>
+                      </div>
+                      <span
+                        aria-label="Checked in"
+                        className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 text-[13px] font-semibold text-white shadow-lg shadow-amber-600/20"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Checked In
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </FadeUp>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          DESKTOP / TABLET (md+) — existing layout preserved
+          ═══════════════════════════════════════════ */}
+      <div className="hidden md:block">
       {/* ═══════════════════════════════════════════
           HERO SECTION — Operational Header
           ═══════════════════════════════════════════ */}
@@ -306,7 +436,7 @@ export default function AttendancePage() {
                       {checkedInCount}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[#64748B]">
-                      Today's check-ins
+                      Today&apos;s check-ins
                     </p>
                   </Card>
                 </FadeUp>
@@ -325,7 +455,7 @@ export default function AttendancePage() {
                       {checkedOutCount}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[#64748B]">
-                      Today's check-outs
+                      Today&apos;s check-outs
                     </p>
                   </Card>
                 </FadeUp>
@@ -378,7 +508,7 @@ export default function AttendancePage() {
           <div className="flex-1 min-w-0">
             {/* Section heading */}
             <div className="pt-2 pb-3">
-              <h2 className="text-[15px] font-semibold text-[#F8FAFC]">Today's Check-Ins</h2>
+              <h2 className="text-[15px] font-semibold text-[#F8FAFC]">Today&apos;s Check-Ins</h2>
             </div>
 
             {/* Table Header */}
@@ -395,9 +525,6 @@ export default function AttendancePage() {
               </span>
               <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
                 Duration
-              </span>
-              <span className="ml-auto text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">
-                Actions
               </span>
             </div>
 
@@ -466,46 +593,6 @@ export default function AttendancePage() {
                             {record.duration}
                           </span>
                         </div>
-
-                        {/* Actions */}
-                        <div className="ml-auto flex items-center gap-2">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-[#3B82F6]/10 hover:text-[#3B82F6]"
-                            title="View"
-                            type="button"
-                          >
-                            <Eye className="h-[15px] w-[15px]" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-indigo-900/30 hover:text-indigo-400"
-                            title="Edit"
-                            type="button"
-                          >
-                            <Edit3 className="h-[15px] w-[15px]" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-emerald-900/30 hover:text-emerald-400"
-                            title="Call"
-                            type="button"
-                          >
-                            <Phone className="h-[15px] w-[15px]" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#64748B] transition-all hover:bg-sky-900/30 hover:text-sky-400"
-                            title="WhatsApp"
-                            type="button"
-                          >
-                            <MessageCircle className="h-[15px] w-[15px]" />
-                          </motion.button>
-                        </div>
                       </motion.div>
                       {i < records.length - 1 && (
                         <div className="border-t border-[#334155]/60" />
@@ -527,7 +614,7 @@ export default function AttendancePage() {
                   <CalendarCheck className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-[#F8FAFC]">Today's Summary</p>
+                  <p className="text-[13px] font-semibold text-[#F8FAFC]">Today&apos;s Summary</p>
                   <p className="text-[11px] text-[#64748B]">
                     {todayShortDate}
                   </p>
@@ -645,6 +732,7 @@ export default function AttendancePage() {
             </FadeUp>
           </div>
         </div>
+      </div>
       {/* Toast */}
       <Toast
         key={toastKey}

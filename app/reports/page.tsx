@@ -184,7 +184,129 @@ export default function ReportsPage() {
   const { kpis, revenue, attendance, membershipStats, expiringMemberships, recentActivity, quickInsights } = data;
 
   return (
-    <div className="space-y-8">
+    <>
+      {/* ═══════════════════════════════════════════
+         MOBILE (phones only, < md breakpoint): compact "Export Reports" utility.
+         Reuses the same report data and export handlers as the desktop page.
+         ═══════════════════════════════════════════ */}
+      <div className="space-y-3 md:hidden">
+        <section className="overflow-hidden rounded-xl border border-[#334155] bg-[#1E293B] shadow-[0_8px_24px_rgba(2,6,23,0.24)]">
+          {/* Section header */}
+          <div className="flex items-center gap-2.5 border-b border-[#334155]/50 px-3.5 py-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+              <Download className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-[15px] font-bold leading-tight text-[#F8FAFC]">Export Reports</h1>
+              <p className="mt-0.5 text-[11px] leading-snug text-[#64748B]">
+                Download business reports for accounting, analysis and backup.
+              </p>
+            </div>
+          </div>
+
+          {/* Report rows — same export handlers as the desktop export cards */}
+          <div className="divide-y divide-[#334155]/40">
+            {[
+              {
+                key: "revenue",
+                name: "Revenue Report",
+                description: "Revenue, collections and payment summary.",
+                Icon: IndianRupee,
+                iconChip: "bg-blue-900/30 text-blue-400",
+                excelClass: "border-blue-500/30 bg-blue-500/10 text-blue-300 active:bg-blue-500/20",
+                onExcel: handleExportRevenueExcel,
+                onPdf: handleExportRevenuePDF,
+                onCsv: handleExportRevenueCSV,
+              },
+              {
+                key: "membership",
+                name: "Membership Report",
+                description: "Member plans, renewals and expiry details.",
+                Icon: Users,
+                iconChip: "bg-emerald-900/30 text-emerald-400",
+                excelClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 active:bg-emerald-500/20",
+                onExcel: handleExportMembershipExcel,
+                onPdf: handleExportMembershipPDF,
+                onCsv: handleExportMembershipCSV,
+              },
+              {
+                key: "attendance",
+                name: "Attendance Report",
+                description: "Daily member attendance and check-in history.",
+                Icon: Activity,
+                iconChip: "bg-amber-900/30 text-amber-400",
+                excelClass: "border-amber-500/30 bg-amber-500/10 text-amber-300 active:bg-amber-500/20",
+                onExcel: handleExportAttendanceExcel,
+                onPdf: handleExportAttendancePDF,
+                onCsv: handleExportAttendanceCSV,
+              },
+              {
+                key: "payment",
+                name: "Payment Report",
+                description: "Payment transactions and collection history.",
+                Icon: FileText,
+                iconChip: "bg-purple-900/30 text-purple-400",
+                excelClass: "border-purple-500/30 bg-purple-500/10 text-purple-300 active:bg-purple-500/20",
+                onExcel: handleExportPaymentExcel,
+                onPdf: handleExportPaymentPDF,
+                onCsv: handleExportPaymentCSV,
+              },
+            ].map((report, idx) => {
+              const ReportIcon = report.Icon;
+              return (
+                <motion.div
+                  key={report.key}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: 0.08 + idx * 0.06 }}
+                  className="px-3.5 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${report.iconChip}`}>
+                        <ReportIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-[#F8FAFC]">{report.name}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-[#64748B]">{report.description}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={report.onExcel}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-semibold transition-colors ${report.excelClass}`}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export Excel
+                    </button>
+                  </div>
+                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={report.onPdf}
+                      className="rounded-lg border border-slate-700 bg-slate-900 py-2 text-[11px] font-semibold text-slate-300 transition-colors active:border-slate-600 active:text-slate-100"
+                    >
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={report.onCsv}
+                      className="rounded-lg border border-slate-700 bg-slate-900 py-2 text-[11px] font-semibold text-slate-300 transition-colors active:border-slate-600 active:text-slate-100"
+                    >
+                      CSV
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         TABLET/DESKTOP (md and up): existing layout — unchanged
+         ═══════════════════════════════════════════ */}
+      <div className="hidden md:block space-y-8">
       {/* -------- Page Header with Filters -------- */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -648,6 +770,7 @@ export default function ReportsPage() {
 
       {/* -------- Quick Insights -------- */}
       <InsightCard items={quickInsights as InsightMessage[]} />
-    </div>
+      </div>
+    </>
   );
 }

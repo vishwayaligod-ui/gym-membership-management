@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { MembershipStatus, PaymentStatus, PaymentMode } from "@prisma/client";
 import { requireApiPermission } from "@/lib/auth-helpers";
+import { sendRenewalReceiptWhatsApp } from "@/lib/whatsapp/receipts";
 
 export async function GET(
   _request: Request,
@@ -189,7 +191,7 @@ export async function PUT(
     });
 
     // Create a payment record for the renewal
-    await prisma.payment.create({
+    const renewalPayment = await prisma.payment.create({
       data: {
         gymId: existingMembership.gymId,
         branchId: existingMembership.branchId,
@@ -201,6 +203,16 @@ export async function PUT(
         paymentDate: new Date(),
         remarks: `Renewal payment for ${existingMembership.plan.name} - ${notes || ""}`.trim(),
       },
+    });
+
+    // Fire-and-forget: deliver the PDF receipt over WhatsApp after the
+    // response. A WhatsApp/PDF failure can never fail the renewal above.
+    after(async () => {
+      try {
+        await sendRenewalReceiptWhatsApp({ paymentId: renewalPayment.id });
+      } catch (error) {
+        console.error("[WhatsApp] Receipt delivery failed (renewal PATCH):", error);
+      }
     });
 
     return NextResponse.json({

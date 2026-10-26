@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { Gender, PaymentMode, PaymentStatus, MembershipStatus, MemberStatus } from "@prisma/client";
 import { getMemberStatus } from "../../lib/member-status";
+import { requireApiPermission } from "../../../lib/auth-helpers";
+import { sendRenewalReceiptWhatsApp } from "@/lib/whatsapp/receipts";
 
 export async function GET(request: Request) {
   try {
@@ -184,6 +187,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const access = await requireApiPermission("members", "create");
+    if (access.response) {
+      return access.response;
+    }
+
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from the request body and never from a database lookup
+    // (e.g. prisma.gym.findFirst()), which is non-deterministic in a
+    // multi-gym database and could attach the member to the wrong gym.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+
     const body = await request.json();
 
     const {
@@ -234,17 +249,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the first gym and branch (multi-tenant support)
-    const gym = await prisma.gym.findFirst();
-    if (!gym) {
+    // Tenant must be known before any write. Require the session gymId and
+    // never fall back to gym table lookups to resolve the current tenant.
+    if (!gymId) {
       return NextResponse.json(
-        { error: "No gym found. Please set up your gym first." },
+        { error: "No gym assigned to your account. Please contact an administrator." },
         { status: 400 }
       );
     }
 
     const branch = await prisma.branch.findFirst({
-      where: { gymId: gym.id, isActive: true },
+      where: { gymId, isActive: true },
     });
     if (!branch) {
       return NextResponse.json(
@@ -255,7 +270,7 @@ export async function POST(request: Request) {
 
     // Generate member code
     const lastMember = await prisma.member.findFirst({
-  where: { gymId: gym.id },
+  where: { gymId },
   orderBy: { memberCode: "desc" },
   select: { memberCode: true },
 });
@@ -296,7 +311,7 @@ const memberCode = `M${String(lastNumber + 1).padStart(5, "0")}`;
       // Create member
       const member = await tx.member.create({
         data: {
-          gymId: gym.id,
+          gymId,
           branchId: branch.id,
           memberCode,
           firstName,
@@ -317,7 +332,7 @@ const memberCode = `M${String(lastNumber + 1).padStart(5, "0")}`;
       // Create membership
       const membership = await tx.membership.create({
         data: {
-          gymId: gym.id,
+          gymId,
           branchId: branch.id,
           memberId: member.id,
           planId: membershipPlanId,
@@ -332,9 +347,9 @@ const memberCode = `M${String(lastNumber + 1).padStart(5, "0")}`;
       });
 
       // Create payment
-      await tx.payment.create({
+      const payment = await tx.payment.create({
         data: {
-          gymId: gym.id,
+          gymId,
           branchId: branch.id,
           memberId: member.id,
           membershipId: membership.id,
@@ -346,17 +361,30 @@ const memberCode = `M${String(lastNumber + 1).padStart(5, "0")}`;
         },
       });
 
-      return member;
+      return { member, payment };
     });
+
+    // Fire-and-forget: for the PAID membership payment created above, deliver
+    // the PDF receipt over WhatsApp after the response. A WhatsApp/PDF failure
+    // can never fail the member creation above.
+    if (result.payment.paymentStatus === PaymentStatus.PAID) {
+      after(async () => {
+        try {
+          await sendRenewalReceiptWhatsApp({ paymentId: result.payment.id });
+        } catch (error) {
+          console.error("[WhatsApp] Receipt delivery failed (member POST):", error);
+        }
+      });
+    }
 
     return NextResponse.json(
       {
         message: "Member created successfully",
         member: {
-          id: result.id,
-          memberCode: result.memberCode,
-          firstName: result.firstName,
-          lastName: result.lastName,
+          id: result.member.id,
+          memberCode: result.member.memberCode,
+          firstName: result.member.firstName,
+          lastName: result.member.lastName,
         },
       },
       { status: 201 }

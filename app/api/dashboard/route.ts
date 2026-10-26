@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PaymentStatus, MembershipStatus, MemberStatus } from "@prisma/client";
 
@@ -9,19 +10,18 @@ function getDayName(date: Date): string {
 
 export async function GET() {
   try {
-    // Get gym and branch for multi-tenant
-    const gym = await prisma.gym.findFirst();
-    if (!gym) {
+    // Scope dashboard data to the authenticated user's gym/branch only.
+    const session = await auth();
+    const gymId = session?.user?.gymId;
+    const branchId = session?.user?.branchId;
+
+    if (!gymId || !branchId) {
       return NextResponse.json({ error: "No gym found" }, { status: 400 });
     }
 
-    const branch = await prisma.branch.findFirst({
-      where: { gymId: gym.id, isActive: true },
-    });
-
     // Common where filters
-    const gymFilter = { gymId: gym.id };
-    const branchFilter = branch ? { ...gymFilter, branchId: branch.id } : gymFilter;
+    const gymFilter = { gymId };
+    const branchFilter = { ...gymFilter, branchId };
 
     // Date boundaries
     const now = new Date();
@@ -193,7 +193,7 @@ export async function GET() {
 
     // ── Membership Distribution (plan-wise) ──
     const plans = await prisma.membershipPlan.findMany({
-      where: { gymId: gym.id, isActive: true },
+      where: { gymId, isActive: true },
       select: { id: true, name: true },
     });
 

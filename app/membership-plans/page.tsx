@@ -14,10 +14,13 @@ import {
   Save,
   Loader2,
   AlertTriangle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { type MembershipPlan, type PlanStatus, transformPlan, type ApiPlan } from "./types";
+import { PlanStatusBadge } from "./PlanStatusBadge";
 import { PlansTable } from "@/components/membership-plans/PlansTable";
 import { Pagination } from "../components/v4/Pagination";
 import { FadeUp } from "../components/v4/MotionDiv";
@@ -394,13 +397,13 @@ export default function MembershipPlansPage() {
       <Toaster position="top-right" richColors closeButton />
 
       {/* ═══════════════════════════════════════════
-         PAGE HEADER
+         PAGE HEADER — DESKTOP (unchanged)
          ═══════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex w-full items-center justify-between gap-4 max-lg:flex-wrap"
+        className="hidden w-full items-center justify-between gap-4 md:flex"
       >
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
@@ -425,9 +428,39 @@ export default function MembershipPlansPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════
-         TOP SUMMARY CARDS
+         PAGE HEADER — MOBILE ONLY (Trainers pattern)
          ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="w-full md:hidden"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-100">
+              Membership Plans
+            </h1>
+            <p className="mt-0.5 text-[13px] text-slate-500">
+              Manage gym membership plans
+            </p>
+          </div>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={openAddModal}
+            className="inline-flex flex-none items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-emerald-600/25"
+            type="button"
+          >
+            <Plus className="h-4 w-4" />
+            Add Plan
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════
+         TOP SUMMARY CARDS — DESKTOP ONLY (hidden on mobile per spec)
+         ═══════════════════════════════════════════ */}
+      <div className="hidden grid-cols-2 gap-3 sm:grid-cols-4 md:grid">
         <FadeUp delay={0.05}>
           <motion.div
             whileHover={{ y: -3, transition: { duration: 0.15 } }}
@@ -512,8 +545,9 @@ export default function MembershipPlansPage() {
       </div>
 
       {/* ═══════════════════════════════════════════
-         SEARCH & FILTER BAR
+         SEARCH & FILTER BAR — DESKTOP (unchanged)
          ═══════════════════════════════════════════ */}
+      <div className="hidden md:block">
       <FadeUp delay={0.1}>
         <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
           {/* Search Row */}
@@ -623,6 +657,110 @@ export default function MembershipPlansPage() {
           )}
         </div>
       </FadeUp>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         SEARCH & FILTERS — MOBILE ONLY (Trainers pattern)
+         ═══════════════════════════════════════════ */}
+      <div className="space-y-3 md:hidden">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search plans..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full rounded-xl border border-slate-700/70 bg-slate-900/60 py-2.5 pl-9 pr-4 text-[13px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/25"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowFilters(!showFilters)}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-[12px] font-semibold transition-all ${
+              showFilters || hasActiveFilters
+                ? "border-emerald-500/40 bg-emerald-900/20 text-emerald-400"
+                : "border-slate-700/70 bg-slate-900/60 text-slate-400"
+            }`}
+            type="button"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {hasActiveFilters && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
+                {[statusFilter !== "All", sortBy !== "name-asc"].filter(Boolean).length}
+              </span>
+            )}
+          </motion.button>
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-[12px] font-semibold text-red-400"
+              type="button"
+            >
+              <X className="h-3 w-3" />
+              Reset
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/60 p-3.5"
+          >
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                Status
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {statusFilters.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => {
+                      setStatusFilter(f.value);
+                      setCurrentPage(1);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all ${
+                      statusFilter === f.value
+                        ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                        : "border border-slate-700 bg-slate-800/60 text-slate-400"
+                    }`}
+                    type="button"
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                Sort by
+              </p>
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-[12px] font-medium text-slate-200 outline-none focus:border-emerald-500/50"
+              >
+                {sortOptions.map((s) => (
+                  <option key={s.value} value={s.value} className="bg-slate-800 text-slate-200">
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </motion.div>
+        )}
+      </div>
 
       {/* ═══════════════════════════════════════════
          MAIN CONTENT: TABLE + PAGINATION
@@ -630,6 +768,8 @@ export default function MembershipPlansPage() {
       <div className="flex flex-col gap-6">
         <div className="flex-1 min-w-0 space-y-4">
           {paginatedPlans.length === 0 ? (
+            <>
+            <div className="hidden md:block">
             <FadeUp delay={0.15}>
               <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-700/40">
@@ -655,8 +795,37 @@ export default function MembershipPlansPage() {
                 )}
               </div>
             </FadeUp>
+            </div>
+            <div className="md:hidden">
+              <FadeUp delay={0.1}>
+                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-16 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-700/40">
+                    <Dumbbell className="h-5 w-5 text-slate-500" />
+                  </div>
+                  <p className="mt-3 text-[15px] font-semibold text-slate-200">No Plans Found</p>
+                  <p className="mt-1 max-w-xs text-[13px] text-slate-500">
+                    {searchQuery || hasActiveFilters
+                      ? "Try adjusting your search terms or filters to find what you are looking for."
+                      : "Get started by creating your first membership plan."}
+                  </p>
+                  {!searchQuery && !hasActiveFilters && (
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={openAddModal}
+                      className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-emerald-600/25"
+                      type="button"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Plan
+                    </motion.button>
+                  )}
+                </div>
+              </FadeUp>
+            </div>
+            </>
           ) : (
             <>
+              <div className="hidden md:block">
               <FadeUp delay={0.15}>
                 <div className="membership-plans-table-shell min-w-0">
                   <PlansTable
@@ -682,6 +851,83 @@ export default function MembershipPlansPage() {
                   }}
                 />
               </FadeUp>
+              </div>
+              <div className="space-y-4 md:hidden">
+                <FadeUp delay={0.1}>
+                  <div className="divide-y divide-slate-700/40 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+                    {paginatedPlans.map((plan) => (
+                      <div key={plan.id} className="flex items-start gap-3 p-4">
+                        <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-emerald-900/30">
+                          <Dumbbell className="h-4 w-4 text-emerald-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-[14px] font-semibold text-slate-100">
+                                {plan.name}
+                              </p>
+                              <p className="mt-0.5 truncate text-[12px] text-slate-500">
+                                {plan.duration} | Rs. {plan.membershipFee.toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                            <div className="flex flex-none items-center gap-1.5">
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleEditRoute(plan)}
+                                className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-400"
+                                type="button"
+                                aria-label={`Edit ${plan.name}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  if (plan.membersUsing === 0) handleDelete(plan);
+                                }}
+                                disabled={plan.membersUsing > 0}
+                                title={
+                                  plan.membersUsing > 0
+                                    ? "Cannot delete a plan assigned to members"
+                                    : `Delete ${plan.name}`
+                                }
+                                className={
+                                  plan.membersUsing > 0
+                                    ? "cursor-not-allowed rounded-lg border border-slate-700/60 bg-slate-800/50 p-2 text-slate-600"
+                                    : "rounded-lg border border-red-900/40 bg-red-950/20 p-2 text-red-400"
+                                }
+                                type="button"
+                                aria-label={`Delete ${plan.name}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </motion.button>
+                            </div>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <PlanStatusBadge status={plan.status} />
+                            <span className="text-[12px] text-slate-500">
+                              {plan.membersUsing} members | {plan.freezeDays}d freeze
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </FadeUp>
+                <FadeUp delay={0.15}>
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredPlans.length}
+                    rowsPerPage={rowsPerPage}
+                    onPageChange={setCurrentPage}
+                    onRowsPerPageChange={(rows) => {
+                      setRowsPerPage(rows);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </FadeUp>
+              </div>
             </>
           )}
         </div>
@@ -706,10 +952,10 @@ export default function MembershipPlansPage() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl rounded-2xl border border-slate-700/60 bg-slate-800 shadow-2xl shadow-black/40"
+              className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-800 shadow-2xl shadow-black/40"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
+              <div className="flex flex-none items-center justify-between border-b border-slate-700/60 px-6 py-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-100">
                     {modalMode === "add" ? "Add Plan" : "Edit Plan"}
@@ -732,8 +978,8 @@ export default function MembershipPlansPage() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                <div className="grid grid-cols-2 gap-5">
                   {/* Plan Name */}
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
@@ -861,7 +1107,7 @@ export default function MembershipPlansPage() {
                   </div>
 
                   {/* Description */}
-                  <div className="sm:col-span-2 space-y-1.5">
+                  <div className="col-span-2 space-y-1.5">
                     <label className="text-[12px] font-semibold uppercase tracking-[0.06em] text-slate-400">
                       Description
                     </label>
@@ -877,7 +1123,7 @@ export default function MembershipPlansPage() {
               </div>
 
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-3 border-t border-slate-700/60 px-6 py-4">
+              <div className="flex flex-none items-center justify-end gap-3 border-t border-slate-700/60 px-6 py-4">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

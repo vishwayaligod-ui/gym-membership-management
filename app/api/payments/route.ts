@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PaymentStatus, PaymentMode, MembershipStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/auth-helpers";
+import { sendRenewalReceiptWhatsApp } from "@/lib/whatsapp/receipts";
 
 export async function GET(request: Request) {
   try {
     const access = await requireApiPermission("payments", "read");
     if (access.response) {
       return access.response;
+    }
+
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from query parameters, body, or URL — the list, its counts,
+    // and its summary aggregates can only ever see this gym's payments.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+    if (!gymId) {
+      return NextResponse.json(
+        { error: "No gym assigned to your account. Please contact an administrator." },
+        { status: 400 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -24,8 +38,8 @@ export async function GET(request: Request) {
     const validLimit = Math.min(100, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
 
-    // Build where clause
-    const where: Record<string, unknown> = {};
+    // Build where clause — always scoped to the authenticated gym.
+    const where: Record<string, unknown> = { gymId };
 
     // Search by member name, phone, or transactionId (receipt number)
     if (search) {
@@ -158,6 +172,7 @@ export async function GET(request: Request) {
         prisma.payment.aggregate({
           _sum: { amount: true },
           where: {
+            gymId,
             paymentStatus: PaymentStatus.PAID,
             paymentDate: { gte: startOfToday },
           },
@@ -165,6 +180,7 @@ export async function GET(request: Request) {
         prisma.payment.aggregate({
           _sum: { amount: true },
           where: {
+            gymId,
             paymentStatus: PaymentStatus.PAID,
             paymentDate: { gte: startOfWeek },
           },
@@ -172,18 +188,19 @@ export async function GET(request: Request) {
         prisma.payment.aggregate({
           _sum: { amount: true },
           where: {
+            gymId,
             paymentStatus: PaymentStatus.PAID,
             paymentDate: { gte: startOfMonth, lte: endOfMonth },
           },
         }),
         prisma.payment.count({
-          where: { paymentStatus: PaymentStatus.PENDING },
+          where: { gymId, paymentStatus: PaymentStatus.PENDING },
         }),
       ]);
 
     const pendingAmount = await prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { paymentStatus: PaymentStatus.PENDING },
+      where: { gymId, paymentStatus: PaymentStatus.PENDING },
     });
 
     return NextResponse.json({
@@ -216,6 +233,19 @@ export async function POST(request: Request) {
     const access = await requireApiPermission("payments", "create");
     if (access.response) {
       return access.response;
+    }
+
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from the request body and never from a database lookup
+    // (e.g. prisma.gym.findFirst()), which is non-deterministic in a
+    // multi-gym database and could attach the payment to the wrong gym.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+    if (!gymId) {
+      return NextResponse.json(
+        { error: "No gym assigned to your account. Please contact an administrator." },
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
@@ -266,9 +296,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify member exists
-    const member = await prisma.member.findUnique({
-      where: { id: memberId },
+    // Verify member exists AND belongs to the authenticated gym.
+    const member = await prisma.member.findFirst({
+      where: { id: memberId, gymId },
     });
 
     if (!member) {
@@ -278,9 +308,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify membership exists and belongs to the member
-    const membership = await prisma.membership.findUnique({
-      where: { id: membershipId },
+    // Verify membership exists and belongs to the authenticated gym.
+    const membership = await prisma.membership.findFirst({
+      where: { id: membershipId, gymId },
       include: {
         plan: {
           select: { name: true },
@@ -302,17 +332,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get gym and branch for multi-tenant support
-    const gym = await prisma.gym.findFirst();
-    if (!gym) {
-      return NextResponse.json(
-        { error: "No gym found. Please set up your gym first." },
-        { status: 400 }
-      );
-    }
-
     const branch = await prisma.branch.findFirst({
-      where: { gymId: gym.id, isActive: true },
+      where: { gymId, isActive: true },
     });
     if (!branch) {
       return NextResponse.json(
@@ -324,7 +345,7 @@ export async function POST(request: Request) {
     // Create the payment
     const payment = await prisma.payment.create({
       data: {
-        gymId: gym.id,
+        gymId,
         branchId: branch.id,
         memberId,
         membershipId,
@@ -371,6 +392,19 @@ export async function POST(request: Request) {
         data: {
           status: MembershipStatus.ACTIVE,
         },
+      });
+    }
+
+    // Fire-and-forget: for successful payments, deliver the PDF receipt over
+    // WhatsApp after the response. A WhatsApp/PDF failure can never fail the
+    // payment above.
+    if (paymentStatus === "PAID") {
+      after(async () => {
+        try {
+          await sendRenewalReceiptWhatsApp({ paymentId: payment.id });
+        } catch (error) {
+          console.error("[WhatsApp] Receipt delivery failed (payment POST):", error);
+        }
       });
     }
 

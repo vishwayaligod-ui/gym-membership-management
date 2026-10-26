@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, CreditCard, FileText, HeartPulse, MapPin, Phone, UserRound, Wallet, ArrowLeft, Loader2 } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, MapPin, Phone, UserRound, Wallet, ArrowLeft, Loader2, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Toaster, toast } from "sonner";
 import { z } from "zod";
@@ -277,31 +277,39 @@ export default function AddMemberPage() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
+  // Shared close/cancel behavior (existing): confirm unsaved changes, then go back.
+  // Reused by the header back/close controls and the bottom Cancel button.
+  const handleCancel = () => {
+    if (isDirty) {
+      const confirmed = window.confirm("You have unsaved changes. Are you sure you want to leave?");
+      if (!confirmed) return;
+    }
+    router.back();
+  };
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" richColors closeButton />
       <div>
-          {/* Header with Back Button */}
+          {/* Header with Back / Close Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
-            <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+            <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
               <button
-                onClick={() => {
-                  if (isDirty) {
-                    const confirmed = window.confirm("You have unsaved changes. Are you sure you want to leave?");
-                    if (!confirmed) return;
-                  }
-                  router.back();
-                }}
+                onClick={handleCancel}
                 type="button"
                 className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200 active:bg-slate-700"
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="min-w-0 flex-1">
-                <p className="text-2xl font-bold tracking-tight text-slate-100">Add New Member</p>
-                <p className="mt-1 text-sm text-slate-500">Register a new member with their personal, health, and membership information</p>
-              </div>
+              <button
+                onClick={handleCancel}
+                type="button"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-900/40 bg-red-950/20 text-red-400 transition hover:border-red-800/60 hover:bg-red-950/40 hover:text-red-300 active:bg-red-950/60"
+                aria-label="Close and go back"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
@@ -309,12 +317,12 @@ export default function AddMemberPage() {
             id="add-member-form"
             ref={formRef}
             onSubmit={handleSubmit(onSubmit)}
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
             noValidate
           >
             {/* Personal Information Section */}
             <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3 sm:p-4 md:p-5">
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2 sm:mb-4">
                 <div className="rounded-lg bg-emerald-900/30 p-2 text-emerald-400">
                   <UserRound className="h-4 w-4" />
                 </div>
@@ -324,7 +332,10 @@ export default function AddMemberPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:gap-4 md:grid-cols-2">
+              <div
+                className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-3 md:grid-cols-2 md:gap-4"
+                style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+              >
                 <FormField label="Full Name" name="fullName" required error={errors.fullName?.message}>
                   <input
                     id="fullName"
@@ -403,7 +414,7 @@ export default function AddMemberPage() {
                   </div>
                 </FormField>
 
-                <div className="md:col-span-2">
+                <div className="col-span-2 min-w-0">
                   <FormField label="Address" name="address" error={errors.address?.message}>
                     <div className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
                       <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
@@ -424,17 +435,10 @@ export default function AddMemberPage() {
 
             {/* Membership Details Section */}
             <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3 sm:p-4 md:p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="rounded-lg bg-blue-900/30 p-2 text-blue-400">
-                  <CreditCard className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-200 sm:text-base">Membership Details</p>
-                  <p className="text-xs text-slate-500 sm:text-sm">Plan, billing and notes</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:gap-4 md:grid-cols-2">
+              <div
+                className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-3 md:grid-cols-2 md:gap-4"
+                style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
+              >
                 <FormField label="Membership Plan" name="membershipPlanId" required error={errors.membershipPlanId?.message}>
                   <select
                     id="membershipPlanId"
@@ -515,81 +519,91 @@ export default function AddMemberPage() {
                   ) : null}
                 </FormField>
 
-                <FormField label="Discount (₹)" name="discount" hint="Optional fixed rupee discount" error={errors.discount?.message}>
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
-                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
-                    <input
-                      id="discount"
-                      type="text"
-                      inputMode="decimal"
-                      {...register("discount")}
-                      className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
-                      placeholder="0"
-                      tabIndex={11}
-                    />
-                  </div>
-                </FormField>
+                <div className="order-5 min-w-0 md:order-none">
+                  <FormField label="Discount (₹)" name="discount" hint="Optional fixed rupee discount" error={errors.discount?.message}>
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                      <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <input
+                        id="discount"
+                        type="text"
+                        inputMode="decimal"
+                        {...register("discount")}
+                        className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
+                        placeholder="0"
+                        tabIndex={11}
+                      />
+                    </div>
+                  </FormField>
+                </div>
 
-                <FormField label="Final Fee (₹)" name="finalFee">
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
-                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
-                    <input
-                      id="finalFee"
-                      type="text"
-                      value={finalFee > 0 ? finalFee.toLocaleString("en-IN") : ""}
-                      readOnly
-                      className="w-full border-none bg-transparent text-sm font-semibold text-emerald-400 outline-none"
-                      placeholder="Auto-calculated"
-                      tabIndex={-1}
-                    />
-                  </div>
-                </FormField>
+                <div className="order-7 min-w-0 md:order-none">
+                  <FormField label="Final Fee (₹)" name="finalFee">
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
+                      <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <input
+                        id="finalFee"
+                        type="text"
+                        value={finalFee > 0 ? finalFee.toLocaleString("en-IN") : ""}
+                        readOnly
+                        className="w-full border-none bg-transparent text-sm font-semibold text-emerald-400 outline-none"
+                        placeholder="Auto-calculated"
+                        tabIndex={-1}
+                      />
+                    </div>
+                  </FormField>
+                </div>
 
-                <FormField label="Amount Paid (₹)" name="amountPaid" hint="Amount collected at joining" error={errors.amountPaid?.message}>
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
-                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
-                    <input
-                      id="amountPaid"
-                      type="text"
-                      inputMode="decimal"
-                      {...register("amountPaid")}
-                      className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
-                      placeholder="0"
-                      tabIndex={12}
-                    />
-                  </div>
-                </FormField>
+                <div className="order-6 min-w-0 md:order-none">
+                  <FormField label="Amount Paid (₹)" name="amountPaid" hint="Amount collected at joining" error={errors.amountPaid?.message}>
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
+                      <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <input
+                        id="amountPaid"
+                        type="text"
+                        inputMode="decimal"
+                        {...register("amountPaid")}
+                        className="w-full border-none bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
+                        placeholder="0"
+                        tabIndex={12}
+                      />
+                    </div>
+                  </FormField>
+                </div>
 
-                <FormField label="Balance Due (₹)" name="balanceDue">
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
-                    <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
-                    <input
-                      id="balanceDue"
-                      type="text"
-                      value={balanceDue > 0 ? balanceDue.toLocaleString("en-IN") : ""}
-                      readOnly
-                      className="w-full border-none bg-transparent text-sm font-semibold text-amber-400 outline-none"
-                      placeholder="Auto-calculated"
-                      tabIndex={-1}
-                    />
-                  </div>
-                </FormField>
+                <div className="order-8 min-w-0 md:order-none">
+                  <FormField label="Balance Due (₹)" name="balanceDue">
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3">
+                      <Wallet className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                      <input
+                        id="balanceDue"
+                        type="text"
+                        value={balanceDue > 0 ? balanceDue.toLocaleString("en-IN") : ""}
+                        readOnly
+                        className="w-full border-none bg-transparent text-sm font-semibold text-amber-400 outline-none"
+                        placeholder="Auto-calculated"
+                        tabIndex={-1}
+                      />
+                    </div>
+                  </FormField>
+                </div>
 
-                <FormField label="Payment Method" name="paymentMethod" required error={errors.paymentMethod?.message}>
-                  <select
-                    id="paymentMethod"
-                    {...register("paymentMethod")}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
-                    tabIndex={10}
-                  >
-                    <option value="Cash" className="bg-slate-800 text-slate-200">Cash</option>
-                    <option value="UPI" className="bg-slate-800 text-slate-200">UPI</option>
-                    <option value="Card" className="bg-slate-800 text-slate-200">Card</option>
-                    <option value="Bank Transfer" className="bg-slate-800 text-slate-200">Bank Transfer</option>
-                  </select>
-                </FormField>
+                <div className="order-9 min-w-0 md:order-none">
+                  <FormField label="Payment Method" name="paymentMethod" required error={errors.paymentMethod?.message}>
+                    <select
+                      id="paymentMethod"
+                      {...register("paymentMethod")}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-emerald-500/30"
+                      tabIndex={10}
+                    >
+                      <option value="Cash" className="bg-slate-800 text-slate-200">Cash</option>
+                      <option value="UPI" className="bg-slate-800 text-slate-200">UPI</option>
+                      <option value="Card" className="bg-slate-800 text-slate-200">Card</option>
+                      <option value="Bank Transfer" className="bg-slate-800 text-slate-200">Bank Transfer</option>
+                    </select>
+                  </FormField>
+                </div>
 
-                <div className="md:col-span-2">
+                <div className="col-span-2 order-10 min-w-0 md:order-none">
                   <FormField label="Notes" name="notes" hint="Optional details for the account" error={errors.notes?.message}>
                     <div className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-slate-900/80 focus-within:ring-1 focus-within:ring-emerald-500/30">
                       <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500" />
@@ -607,16 +621,10 @@ export default function AddMemberPage() {
             </section>
 
             {/* Save / Cancel */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+            <div className="flex items-center gap-3 sm:justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  if (isDirty) {
-                    const confirmed = window.confirm("You have unsaved changes. Are you sure you want to leave?");
-                    if (!confirmed) return;
-                  }
-                  router.back();
-                }}
+                onClick={handleCancel}
                 className="min-h-12 flex-1 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200 active:bg-slate-700 sm:flex-none sm:px-6"
                 tabIndex={15}
               >

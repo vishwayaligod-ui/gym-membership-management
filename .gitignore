@@ -41,3 +41,16 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Local logs and temporary testing artifacts
+*.log
+.tmp-*
+dev-reset*
+server.log
+fin.txt
+
+# Local editor check files
+.cline-*
+
+# Exclude manual WhatsApp test endpoint
+/app/api/whatsapp/test-send/

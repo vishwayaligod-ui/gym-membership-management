@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/whatsapp-reminders",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-receipt-retry",
+      "schedule": "0 */3 * * *"
+    }
+  ]
+}

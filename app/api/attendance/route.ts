@@ -174,41 +174,61 @@ export async function POST(request: Request) {
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
 
+    // Read-only validation runs OUTSIDE the interactive transaction (plain
+    // prisma client). None of these checks need transactional isolation, and
+    // keeping them inside was pushing the interactive transaction past its
+    // 5s timeout (P2028) because every sequential query inside pays full DB
+    // round-trip latency. Only the duplicate check + attendance create — the
+    // part that must stay atomic — remains inside the transaction.
+    const member = await prisma.member.findUnique({
+      where: { id: memberId },
+    });
+
+    if (!member || (gymId && member.gymId !== gymId) || (branchId && member.branchId !== branchId)) {
+      throw new ApiError("Member not found", 404);
+    }
+
+    if (member.status !== MemberStatus.ACTIVE) {
+      throw new ApiError("Member is not active for check-in", 403);
+    }
+
+    const latestMembership = await prisma.membership.findFirst({
+      where: {
+        memberId: member.id,
+        ...(gymId ? { gymId } : {}),
+        ...(branchId ? { branchId } : {}),
+      },
+      orderBy: {
+        startDate: "desc",
+      },
+    });
+
+    if (!latestMembership) {
+      throw new ApiError("No active membership found for this member", 403);
+    }
+
+    if (
+      latestMembership.status !== MembershipStatus.ACTIVE ||
+      latestMembership.endDate < now
+    ) {
+      throw new ApiError("Membership is not active for check-in", 403);
+    }
+
+    // Resolve a *valid* User id for the audit column. The session user id can
+    // be stale (e.g. a cookie issued before a DB re-seed), which would make
+    // Attendance_createdById_fkey fail with P2003 -> generic 500. Never write
+    // an id that does not exist; fall back to a real user in the database.
+    // Read-only — safe to resolve before the transaction.
+    const sessionUser = session?.user?.id
+      ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true } })
+      : null;
+    const createdBy = sessionUser ?? (await prisma.user.findFirst({ select: { id: true } }));
+
+    if (!createdBy) {
+      throw new ApiError("Unable to resolve the user recording this check-in", 500);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      const member = await tx.member.findUnique({
-        where: { id: memberId },
-      });
-
-      if (!member || (gymId && member.gymId !== gymId) || (branchId && member.branchId !== branchId)) {
-        throw new ApiError("Member not found", 404);
-      }
-
-      if (member.status !== MemberStatus.ACTIVE) {
-        throw new ApiError("Member is not active for check-in", 403);
-      }
-
-      const latestMembership = await tx.membership.findFirst({
-        where: {
-          memberId: member.id,
-          ...(gymId ? { gymId } : {}),
-          ...(branchId ? { branchId } : {}),
-        },
-        orderBy: {
-          startDate: "desc",
-        },
-      });
-
-      if (!latestMembership) {
-        throw new ApiError("No active membership found for this member", 403);
-      }
-
-      if (
-        latestMembership.status !== MembershipStatus.ACTIVE ||
-        latestMembership.endDate < now
-      ) {
-        throw new ApiError("Membership is not active for check-in", 403);
-      }
-
       const duplicate = await tx.attendance.findFirst({
         where: {
           memberId: member.id,
@@ -230,7 +250,7 @@ export async function POST(request: Request) {
           gymId: member.gymId,
           branchId: member.branchId,
           memberId: member.id,
-          createdById: session?.user?.id ?? (await tx.user.findFirst({ select: { id: true } }))?.id ?? "",
+          createdById: createdBy.id,
           attendanceDate: todayStart,
           checkIn: now,
           checkOut: null,
@@ -240,6 +260,11 @@ export async function POST(request: Request) {
       });
 
       return attendance;
+    }, {
+      // Targeted fix for P2028: interactive transactions default to a 5s
+      // timeout, which was already exceeded under high DB latency. 10s gives
+      // safe headroom without hiding genuine failures.
+      timeout: 10_000,
     });
 
     return NextResponse.json(

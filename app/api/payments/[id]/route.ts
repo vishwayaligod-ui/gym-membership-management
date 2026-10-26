@@ -13,10 +13,23 @@ export async function GET(
       return access.response;
     }
 
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from the request body or query parameters. The URL payment
+    // id must belong to this gym, otherwise 404 is returned and a
+    // payment of another gym is never exposed.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+    if (!gymId) {
+      return NextResponse.json(
+        { error: "No gym assigned to your account. Please contact an administrator." },
+        { status: 400 }
+      );
+    }
+
     const { id } = await params;
 
-    const payment = await prisma.payment.findUnique({
-      where: { id },
+    const payment = await prisma.payment.findFirst({
+      where: { id, gymId },
       include: {
         member: {
           select: {
@@ -107,6 +120,19 @@ export async function PUT(
       return access.response;
     }
 
+    // Tenant scope is derived ONLY from the authenticated session.
+    // Never from the request body and never from a database lookup.
+    // The URL payment id must belong to this gym, otherwise the request
+    // is rejected with 404 before any update is performed.
+    const session = access.session;
+    const gymId = session?.user?.gymId;
+    if (!gymId) {
+      return NextResponse.json(
+        { error: "No gym assigned to your account. Please contact an administrator." },
+        { status: 400 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -154,9 +180,9 @@ export async function PUT(
       );
     }
 
-    // Check payment exists
-    const existingPayment = await prisma.payment.findUnique({
-      where: { id },
+    // Check payment exists AND belongs to the authenticated gym.
+    const existingPayment = await prisma.payment.findFirst({
+      where: { id, gymId },
       include: {
         member: {
           select: {

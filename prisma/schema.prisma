@@ -81,6 +81,19 @@ enum PTSessionStatus {
   CANCELLED
 }
 
+enum WhatsAppMessageType {
+  RENEWAL_REMINDER_7_DAYS
+  RENEWAL_REMINDER_3_DAYS
+  RENEWAL_RECEIPT
+}
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model Gym {
   id       String    @id @default(uuid())
   name     String
@@ -94,6 +107,8 @@ model Gym {
   country  String?
   pincode  String?
   timezone String    @default("Asia/Kolkata")
+  whatsappMessages WhatsAppMessageLog[]
+
   currency String    @default("INR")
   status   GymStatus @default(ACTIVE)
 
@@ -338,16 +353,17 @@ model Member {
 
   status MemberStatus @default(ACTIVE)
 
-  photo String?
-
-  notes String?
-
   memberships  Membership[]
   payments     Payment[]
   attendances  Attendance[]
   workoutPlans WorkoutPlan[]
   dietPlans    DietPlan[]
   ptSessions   PTSession[]
+  whatsappMessages WhatsAppMessageLog[]
+
+  photo String?
+
+  notes String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -415,6 +431,8 @@ model Membership {
   remarks String?
 
   payments Payment[]
+
+  whatsappMessages WhatsAppMessageLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -655,9 +673,52 @@ model PTSession {
 
   @@index([gymId])
   @@index([branchId])
-  @@index([trainerProfileId])
   @@index([memberId])
   @@index([ptPackageId])
   @@index([sessionDate])
   @@index([status])
 }
+
+model WhatsAppMessageLog {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String?
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  membershipId String?
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  paymentId String?
+
+  type WhatsAppMessageType
+
+  // Unique key guaranteeing at-most-one delivered message per
+  // (member, membership, reminder type / payment, target expiry date).
+  dedupeKey String @unique
+
+  recipientPhone String
+  templateName   String?
+
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  messageId    String?
+
+  status   WhatsAppMessageStatus @default(PENDING)
+  attempts Int                   @default(0)
+  error    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId])
+  @@index([memberId])
+  @@index([membershipId])
+  @@index([status])
+  @@index([type, scheduledFor])
+}
+

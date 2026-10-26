@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma, type Gym, type GymSettings } from "@prisma/client";
+import { auth } from "@/auth";
 import {
   cloneDefaultGymSettings,
   type GymSettingsPayload,
@@ -10,8 +11,30 @@ type GymWithSettings = Gym & {
   settings: GymSettings | null;
 };
 
+/**
+ * Resolves the gym whose settings the Settings module reads/writes.
+ *
+ * The database is multi-gym. `gym.findFirst()` without an `orderBy` is
+ * non-deterministic and was routinely returning an empty duplicate gym, so the
+ * Settings page loaded defaults and saved to the wrong gym. Use the
+ * authenticated user's gym as the source of truth (matching the rest of the
+ * app), and only fall back to the oldest gym if a session scope is unavailable.
+ */
 export async function getPrimaryGym() {
+  const session = await auth();
+  const gymId = session?.user?.gymId;
+
+  if (gymId) {
+    return prisma.gym.findFirst({
+      where: { id: gymId },
+      include: {
+        settings: true,
+      },
+    });
+  }
+
   return prisma.gym.findFirst({
+    orderBy: { createdAt: "asc" },
     include: {
       settings: true,
     },

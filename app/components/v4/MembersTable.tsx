@@ -13,7 +13,10 @@ function formatINR(value: number): string {
   const [intPart, decPart] = abs.split(".");
   const last3 = intPart.slice(-3);
   const rest = intPart.slice(0, -3);
-  const groupedInt = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${last3}` : last3;
+  const groupedInt = rest
+    ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${last3}`
+    : last3;
+
   return `${sign}${groupedInt}${decPart ? `.${decPart}` : ""}`;
 }
 
@@ -23,7 +26,11 @@ type MembersTableProps = {
   isDeleting?: string | null;
 };
 
-export function MembersTable({ members, onDelete, isDeleting }: MembersTableProps) {
+export function MembersTable({
+  members,
+  onDelete,
+  isDeleting,
+}: MembersTableProps) {
   const router = useRouter();
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
 
@@ -60,7 +67,9 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
               onMouseLeave={() => setHoveredRow(null)}
               onClick={() => router.push(`/members/${member.id}`)}
               className={`grid grid-cols-1 md:grid-cols-[56px_120px_120px_100px_100px_110px_110px_120px_130px_70px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
-                hoveredRow === member.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
+                hoveredRow === member.id
+                  ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+                  : "bg-transparent"
               }`}
             >
               {/* Avatar */}
@@ -75,54 +84,134 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[11px] font-bold text-white shadow-sm shadow-blue-900/30">
                   {member.avatar}
                 </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-200 truncate">{member.name}</p>
+                    <p className="text-sm font-semibold text-slate-200 truncate">
+                      {member.name}
+                    </p>
                     <StatusBadge status={member.status} />
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{member.phone}</p>
+
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {member.phone}
+                  </p>
+
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${planColor}`}>
+                    <span
+                      className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${planColor}`}
+                    >
                       {member.plan}
                     </span>
-                    <span className="text-[10px] text-slate-500 whitespace-nowrap">{member.joinedOn} → {member.expiresOn}</span>
+
+                    <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                      {member.joinedOn} → {member.expiresOn}
+                    </span>
                   </div>
+
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                    <span className="text-[9px] text-blue-400/80">Discount: ₹{formatINR(member.discount)}</span>
-                    <span className="text-[9px] text-emerald-400/80">Paid: ₹{formatINR(member.amountPaid)}</span>
-                    <span className="text-[9px] text-amber-400/80">Due: ₹{formatINR(member.balanceDue)}</span>
+                    <span className="text-[9px] text-blue-400/80">
+                      Discount: ₹{formatINR(member.discount)}
+                    </span>
+
+                    <span className="text-[9px] text-emerald-400/80">
+                      Paid: ₹{formatINR(member.amountPaid)}
+                    </span>
+
+                    <span className="text-[9px] text-amber-400/80">
+                      Due: ₹{formatINR(member.balanceDue)}
+                    </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Mobile Actions */}
+              <div className="flex items-center gap-2 md:hidden">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/members/${member.id}/edit`);
+                  }}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-[11px] font-semibold text-slate-300 transition-all duration-200 hover:border-blue-500/40 hover:bg-blue-900/20 hover:text-blue-400"
+                  title="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/renewals?memberId=${member.id}`);
+                  }}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-[11px] font-semibold text-slate-300 transition-all duration-200 hover:border-blue-500/40 hover:bg-blue-900/20 hover:text-blue-400"
+                  title="Renew Membership"
+                >
+                  <Repeat className="h-3.5 w-3.5" />
+                  Renew
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onDelete) onDelete(member.id);
+                  }}
+                  disabled={isDeleting === member.id}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-[11px] font-semibold text-red-300 transition-all duration-200 hover:bg-red-900/30 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Delete"
+                >
+                  {isDeleting === member.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  Delete
+                </button>
               </div>
 
               {/* Desktop: Member column — Name + Username */}
               <div className="hidden md:flex items-center min-w-0">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-200 truncate">{member.name}</p>
-                  <p className="text-[11px] text-slate-500 truncate">{member.username}</p>
+                  <p className="text-[13px] font-semibold text-slate-200 truncate">
+                    {member.name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {member.username}
+                  </p>
                 </div>
               </div>
 
               {/* Desktop: Phone */}
               <div className="hidden md:flex items-center">
-                <span className="text-[12px] text-slate-400 whitespace-nowrap">{member.phone}</span>
+                <span className="text-[12px] text-slate-400 whitespace-nowrap">
+                  {member.phone}
+                </span>
               </div>
 
               {/* Desktop: Plan badge */}
               <div className="hidden md:flex items-center">
-                <span className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${planColor}`}>
+                <span
+                  className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${planColor}`}
+                >
                   {member.plan}
                 </span>
               </div>
 
               {/* Desktop: Join Date */}
               <div className="hidden md:flex items-center">
-                <span className="text-[12px] text-slate-400 whitespace-nowrap">{member.joinedOn}</span>
+                <span className="text-[12px] text-slate-400 whitespace-nowrap">
+                  {member.joinedOn}
+                </span>
               </div>
 
               {/* Desktop: Expiry Date */}
               <div className="hidden md:flex items-center">
-                <span className="text-[12px] text-slate-400 whitespace-nowrap">{member.expiresOn}</span>
+                <span className="text-[12px] text-slate-400 whitespace-nowrap">
+                  {member.expiresOn}
+                </span>
               </div>
 
               {/* Desktop: Status */}
@@ -133,9 +222,15 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
               {/* Desktop: Payment */}
               <div className="hidden md:flex items-center">
                 <div className="space-y-0.5">
-                  <p className="text-[13px] text-emerald-400/80">Paid: ₹{formatINR(member.amountPaid)}</p>
-                  <p className="text-[13px] text-amber-400/80">Due: ₹{formatINR(member.balanceDue)}</p>
-                  <p className="text-[13px] text-blue-400/80">Discount: ₹{formatINR(member.discount)}</p>
+                  <p className="text-[13px] text-emerald-400/80">
+                    Paid: ₹{formatINR(member.amountPaid)}
+                  </p>
+                  <p className="text-[13px] text-amber-400/80">
+                    Due: ₹{formatINR(member.balanceDue)}
+                  </p>
+                  <p className="text-[13px] text-blue-400/80">
+                    Discount: ₹{formatINR(member.discount)}
+                  </p>
                 </div>
               </div>
 
@@ -154,6 +249,7 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </motion.button>
+
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -167,6 +263,7 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                 >
                   <Repeat className="h-3.5 w-3.5" />
                 </motion.button>
+
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -187,11 +284,13 @@ export function MembersTable({ members, onDelete, isDeleting }: MembersTableProp
                 </motion.button>
               </div>
 
-              {/* Chevron for mobile */}
+              {/* Chevron for desktop */}
               <div className="hidden md:flex items-center justify-end">
-                <ChevronDown className={`h-3.5 w-3.5 text-slate-600 transition-transform duration-200 ${
-                  hoveredRow === member.id ? "rotate-[-90deg]" : ""
-                }`} />
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-slate-600 transition-transform duration-200 ${
+                    hoveredRow === member.id ? "rotate-[-90deg]" : ""
+                  }`}
+                />
               </div>
             </motion.div>
           );

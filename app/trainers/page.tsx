@@ -11,11 +11,16 @@ import {
   UserCheck,
   SlidersHorizontal,
   X,
+  Pencil,
+  Trash2,
+  Star,
+  Loader2,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import type { Trainer, TrainerStatus, TrainersResponse } from "./types";
 import { TrainersTable } from "@/components/trainers/TrainersTable";
+import { TrainerStatusBadge } from "./TrainerStatusBadge";
 import { Pagination } from "../components/v4/Pagination";
 import { FadeUp } from "../components/v4/MotionDiv";
 
@@ -215,6 +220,300 @@ export default function TrainersPage() {
     <>
       <Toaster position="top-right" richColors closeButton />
       <div className="space-y-6">
+      {/* ═══════════════════════════════════════════
+         MOBILE (below md): compact receptionist trainer list
+         SEARCH → FILTERS → TRAINER LIST → ACTIONS
+         ═══════════════════════════════════════════ */}
+      <div className="space-y-4 md:hidden">
+        {/* Compact page header */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-bold tracking-tight text-slate-100">
+              Trainers
+            </h1>
+            <p className="mt-0.5 text-[12px] text-slate-500">
+              Manage gym trainers
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/trainers/add")}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-3 text-[12px] font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-500 hover:to-blue-400 active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            Add Trainer
+          </button>
+        </div>
+
+        {/* Search — first interactive element on the page */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search trainers..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Search trainers"
+            className="h-11 w-full rounded-xl border border-slate-700/70 bg-slate-900/60 pl-10 pr-10 text-[15px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-blue-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-blue-500/30"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-colors hover:text-slate-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Status filter chips + advanced filters toggle */}
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {statusFilters.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(f.value);
+                  setCurrentPage(1);
+                }}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${
+                  statusFilter === f.value
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                    : "border border-slate-700/70 bg-slate-800/50 text-slate-400"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            aria-label="More filters"
+            aria-expanded={showFilters}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all active:scale-95 ${
+              showFilters || hasActiveFilters
+                ? "border-blue-500/40 bg-blue-900/20 text-blue-400"
+                : "border-slate-700 bg-slate-800/50 text-slate-400"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Advanced filters — existing specialization/sort state and handlers */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="mobile-specialization-filter" className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                      Specialization
+                    </label>
+                    <select
+                      id="mobile-specialization-filter"
+                      value={specializationFilter}
+                      onChange={(e) => {
+                        setSpecializationFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900/60 px-2 text-[13px] font-medium text-slate-300 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      {specializationFilters.map((s) => (
+                        <option key={s} value={s} className="bg-slate-800 text-slate-300">
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="mobile-sort-filter" className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                      Sort
+                    </label>
+                    <select
+                      id="mobile-sort-filter"
+                      value={sortBy}
+                      onChange={(e) => {
+                        setSortBy(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900/60 px-2 text-[13px] font-medium text-slate-300 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      {sortOptions.map((s) => (
+                        <option key={s.value} value={s.value} className="bg-slate-800 text-slate-300">
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/20 py-2 text-[12px] font-semibold text-red-400 transition-all hover:bg-red-950/30 active:scale-[0.99]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Loading / error states */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-14 text-center">
+            <Loader2 className="h-7 w-7 animate-spin text-slate-500" />
+            <p className="mt-3 text-[14px] font-semibold text-slate-300">Loading trainers...</p>
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-14 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-950/20">
+              <X className="h-5 w-5 text-red-400" />
+            </div>
+            <p className="mt-3 text-[15px] font-semibold text-slate-300">Unable to load trainers</p>
+            <p className="mt-1 max-w-xs text-[13px] text-slate-500">{loadError}</p>
+            <button
+              type="button"
+              onClick={fetchTrainers}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-2.5 text-[13px] font-semibold text-slate-200 transition-all hover:border-slate-600 active:scale-95"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {/* Empty state / trainer list */}
+        {!loading && !loadError &&
+          (paginatedTrainers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-14 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-700/40">
+                <Dumbbell className="h-5 w-5 text-slate-500" />
+              </div>
+              <p className="mt-3 text-[15px] font-semibold text-slate-300">No trainers found</p>
+              <p className="mt-1 max-w-xs text-[13px] text-slate-500">
+                {searchQuery || hasActiveFilters
+                  ? "Try adjusting your search or filters."
+                  : "Get started by adding your first trainer."}
+              </p>
+              {!searchQuery && !hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/trainers/add")}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-500 hover:to-blue-400 active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Trainer
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+                <div className="divide-y divide-slate-700/40">
+                  {paginatedTrainers.map((trainer) => (
+                    <div
+                      key={trainer.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/trainers/${trainer.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/trainers/${trainer.id}`);
+                        }
+                      }}
+                      className="flex cursor-pointer items-center gap-3 px-3.5 py-3 transition-colors active:bg-slate-700/30"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[12px] font-bold text-white shadow-sm shadow-blue-900/30">
+                        {trainer.avatar}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-[15px] font-semibold leading-snug text-slate-100">
+                            {trainer.name}
+                          </p>
+                          <TrainerStatusBadge status={trainer.status} />
+                        </div>
+                        <p className="mt-0.5 truncate text-[12px] text-slate-500">
+                          {trainer.specialization}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2.5">
+                          <span className="text-[11px] text-slate-500">
+                            {trainer.experience} yrs exp
+                          </span>
+                          <span className="flex items-center gap-0.5 text-[11px] font-medium text-amber-400">
+                            <Star className="h-3 w-3 fill-amber-400" />
+                            {trainer.rating}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(`/trainers/${trainer.id}/edit`);
+                          }}
+                          aria-label={`Edit ${trainer.name}`}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/70 text-slate-300 transition-colors hover:border-slate-600 hover:text-white active:scale-95"
+                        >
+                          <Pencil className="h-[15px] w-[15px]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setTrainerToDelete(trainer);
+                          }}
+                          aria-label={`Delete ${trainer.name}`}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-900/40 bg-red-950/20 text-red-300 transition-colors hover:border-red-700/60 hover:text-red-200 active:scale-95"
+                        >
+                          <Trash2 className="h-[15px] w-[15px]" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredTrainers.length}
+                rowsPerPage={rowsPerPage}
+                onPageChange={setCurrentPage}
+                onRowsPerPageChange={(rows) => {
+                  setRowsPerPage(rows);
+                  setCurrentPage(1);
+                }}
+              />
+            </>
+          ))}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         TABLET/DESKTOP (md and up): existing layout — unchanged
+         ═══════════════════════════════════════════ */}
+      <div className="hidden md:block space-y-6">
       {/* ═══════════════════════════════════════════
          PAGE HEADER
          ═══════════════════════════════════════════ */}
@@ -554,6 +853,7 @@ export default function TrainersPage() {
             </>
           )}
         </div>
+      </div>
       </div>
       </div>
 

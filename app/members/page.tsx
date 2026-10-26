@@ -16,8 +16,12 @@ import {
   ChevronDown,
   SlidersHorizontal,
   Loader2,
+  Pencil,
+  Repeat,
+  Trash2,
+  EllipsisVertical,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { exportRowsToExcel, getExportDateStamp } from "@/lib/export/exportExcel";
 import { type MemberStatus, type Member, type MembersKPIs, planColors } from "./types";
@@ -43,6 +47,36 @@ const sortOptions = [
   { label: "Name Z-A", value: "name-desc" },
   { label: "Expiry Soon", value: "expiry-asc" },
 ];
+
+// Compact subtitle for the mobile member list row. Presentation-only: derives
+// the "Plan • X days left" / "Plan • Expired X days ago" copy from the member's
+// existing expiresOn + status data. No status/business rules are changed here.
+function getMobileMemberSublabel(member: Member): string {
+  if (member.status === "Pending") {
+    return "No active plan";
+  }
+
+  const expiry = new Date(member.expiresOn);
+  if (Number.isNaN(expiry.getTime())) {
+    return member.plan;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expiry.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0 || (member.status === "Expired" && diffDays === 0)) {
+    const daysPast = Math.max(0, Math.abs(diffDays));
+    const agoLabel =
+      daysPast === 0 ? "today" : daysPast === 1 ? "yesterday" : `${daysPast} days ago`;
+    return `${member.plan} • Expired ${agoLabel}`;
+  }
+  if (diffDays === 0) {
+    return `${member.plan} • Expires today`;
+  }
+  return `${member.plan} • ${diffDays} ${diffDays === 1 ? "day" : "days"} left`;
+}
 
 export default function MembersPage() {
   const router = useRouter();
@@ -92,6 +126,26 @@ export default function MembersPage() {
   useEffect(() => {
     fetchMembers();
   }, [fetchMembers]);
+
+  // Mobile-only UI state: overflow menu (Export/Import) and the per-member
+  // action sheet. Presentation-layer only — both reuse the existing handlers.
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [actionSheetMember, setActionSheetMember] = useState<Member | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close the mobile overflow menu when tapping/clicking outside of it.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isMobileMenuOpen]);
 
   // Pagination (client-side after filtering)
   const filteredMembers = useMemo(() => {
@@ -274,6 +328,343 @@ export default function MembersPage() {
   return (
     <div className="space-y-6">
       <Toaster position="top-right" richColors closeButton />
+
+      {/* Shared hidden file input for Excel/CSV import — used by the desktop
+          Import button and the mobile overflow menu. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleImportFile(file);
+          }
+        }}
+      />
+
+      {/* ═══════════════════════════════════════════
+         MOBILE (below md): compact receptionist member list
+         SEARCH → FILTER → MEMBER LIST → MEMBER DETAILS
+         ═══════════════════════════════════════════ */}
+      <div className="space-y-4 md:hidden">
+        {/* Compact page header */}
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-[22px] font-bold tracking-tight text-slate-100">
+            Members
+          </h1>
+          <div className="flex items-center gap-2">
+            {/* Overflow: Export / Import — compact, least intrusive placement */}
+            <div className="relative" ref={mobileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen((open) => !open)}
+                aria-label="More options"
+                aria-haspopup="menu"
+                aria-expanded={isMobileMenuOpen}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/60 text-slate-400 transition-all hover:border-slate-600 hover:text-slate-200 active:scale-95"
+              >
+                <EllipsisVertical className="h-[18px] w-[18px]" />
+              </button>
+              <AnimatePresence>
+                {isMobileMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-slate-700 bg-[#111827] py-1 shadow-2xl shadow-black/50"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleExport();
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                    >
+                      <Download className="h-4 w-4 text-slate-500" />
+                      Export members
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleImportButtonClick();
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                    >
+                      {isImporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                      ) : (
+                        <Upload className="h-4 w-4 text-slate-500" />
+                      )}
+                      Import members
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Add member — existing route/action preserved */}
+            <button
+              type="button"
+              onClick={() => router.push("/members/add")}
+              aria-label="Add Member"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-500 hover:to-blue-400 active:scale-95"
+            >
+              <Plus className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        </div>
+
+        {/* Search — first interactive element on the page */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search members..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-11 w-full rounded-xl border border-slate-700/70 bg-slate-900/60 pl-10 pr-10 text-[15px] text-slate-200 outline-none placeholder:text-slate-500 transition-all focus:border-blue-500 focus:bg-slate-900/80 focus:ring-1 focus:ring-blue-500/30"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-colors hover:text-slate-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Status filter chips — wired to the existing statusFilter logic */}
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {statusFilters.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(f.value);
+                  setCurrentPage(1);
+                }}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all active:scale-95 ${
+                  statusFilter === f.value
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                    : "border border-slate-700/70 bg-slate-800/50 text-slate-400"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            aria-label="More filters"
+            aria-expanded={showFilters}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-all active:scale-95 ${
+              showFilters || planFilter !== "All" || genderFilter !== "All" || sortBy !== "newest"
+                ? "border-blue-500/40 bg-blue-900/20 text-blue-400"
+                : "border-slate-700 bg-slate-800/50 text-slate-400"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Advanced filters — existing plan/gender/sort state and handlers */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label htmlFor="mobile-plan-filter" className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                      Plan
+                    </label>
+                    <select
+                      id="mobile-plan-filter"
+                      value={planFilter}
+                      onChange={(e) => {
+                        setPlanFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900/60 px-2 text-[13px] font-medium text-slate-300 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      {planFilters.map((p) => (
+                        <option key={p} value={p} className="bg-slate-800 text-slate-300">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="mobile-gender-filter" className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                      Gender
+                    </label>
+                    <select
+                      id="mobile-gender-filter"
+                      value={genderFilter}
+                      onChange={(e) => {
+                        setGenderFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900/60 px-2 text-[13px] font-medium text-slate-300 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      {genderFilters.map((g) => (
+                        <option key={g} value={g} className="bg-slate-800 text-slate-300">
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="mobile-sort-filter" className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+                      Sort
+                    </label>
+                    <select
+                      id="mobile-sort-filter"
+                      value={sortBy}
+                      onChange={(e) => {
+                        setSortBy(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900/60 px-2 text-[13px] font-medium text-slate-300 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      {sortOptions.map((s) => (
+                        <option key={s.value} value={s.value} className="bg-slate-800 text-slate-300">
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/20 py-2 text-[12px] font-semibold text-red-400 transition-all hover:bg-red-950/30 active:scale-[0.99]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Member list / states */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-14 text-center">
+            <Loader2 className="h-7 w-7 animate-spin text-slate-500" />
+            <p className="mt-3 text-[14px] font-semibold text-slate-300">Loading members...</p>
+          </div>
+        ) : paginatedMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-14 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-700/40">
+              <Users className="h-5 w-5 text-slate-500" />
+            </div>
+            <p className="mt-3 text-[15px] font-semibold text-slate-300">No members found</p>
+            <p className="mt-1 max-w-xs text-[13px] text-slate-500">
+              {searchQuery || hasActiveFilters
+                ? "Try adjusting your search or filters."
+                : "Get started by adding your first member."}
+            </p>
+            {!searchQuery && !hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => router.push("/members/add")}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-500 hover:to-blue-400 active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                Add Member
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/40">
+              <div className="divide-y divide-slate-700/40">
+                {paginatedMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/members/${member.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/members/${member.id}`);
+                      }
+                    }}
+                    className="flex cursor-pointer items-center gap-3 px-3.5 py-3 transition-colors active:bg-slate-700/30"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[12px] font-bold text-white shadow-sm shadow-blue-900/30">
+                      {member.avatar}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold leading-snug text-slate-100">
+                        {member.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-[12px] text-slate-500">
+                        {getMobileMemberSublabel(member)}
+                      </p>
+                    </div>
+                    <StatusBadge status={member.status} />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActionSheetMember(member);
+                      }}
+                      aria-label={`Actions for ${member.name}`}
+                      aria-haspopup="menu"
+                      className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:text-slate-300 active:bg-slate-700/40"
+                    >
+                      <EllipsisVertical className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredMembers.length}
+              rowsPerPage={rowsPerPage}
+              onPageChange={setCurrentPage}
+              onRowsPerPageChange={(rows) => {
+                setRowsPerPage(rows);
+                setCurrentPage(1);
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+         TABLET/DESKTOP (md and up): existing layout — unchanged
+         ═══════════════════════════════════════════ */}
+      <div className="hidden md:block space-y-6">
       {/* ═══════════════════════════════════════════
          PAGE HEADER
          ═══════════════════════════════════════════ */}
@@ -326,18 +717,6 @@ export default function MembersPage() {
             )}
             Import
           </motion.button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleImportFile(file);
-              }
-            }}
-          />
         </div>
       </motion.div>
 
@@ -644,6 +1023,155 @@ export default function MembersPage() {
             </>
           )}
       </div>
+      </div>
+
+      {/* Mobile member action sheet — keeps the previous per-card Edit / Renew /
+          Delete actions available without cluttering the list. All actions
+          reuse the same routes/handlers the Members page has always used. */}
+      <AnimatePresence>
+        {actionSheetMember && (
+          <MemberActionSheet
+            key="member-action-sheet"
+            member={actionSheetMember}
+            isDeleting={isDeleting}
+            onClose={() => setActionSheetMember(null)}
+            onEdit={(id) => {
+              setActionSheetMember(null);
+              router.push(`/members/${id}/edit`);
+            }}
+            onRenew={(id) => {
+              setActionSheetMember(null);
+              router.push(`/renewals?memberId=${id}`);
+            }}
+            onDelete={(id) => {
+              setActionSheetMember(null);
+              handleDelete(id);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE MEMBER ACTION SHEET
+   Compact bottom sheet that preserves the previous per-card Edit / Renew /
+   Delete actions without putting large buttons on every member row. Every
+   action reuses the same routes/handlers the Members page has always used.
+   ═══════════════════════════════════════════ */
+type MemberActionSheetProps = {
+  member: Member;
+  isDeleting: string | null;
+  onClose: () => void;
+  onEdit: (memberId: string) => void;
+  onRenew: (memberId: string) => void;
+  onDelete: (memberId: string) => void;
+};
+
+function MemberActionSheet({
+  member,
+  isDeleting,
+  onClose,
+  onEdit,
+  onRenew,
+  onDelete,
+}: MemberActionSheetProps) {
+  // Close on Escape (consistent with the global navigation drawer).
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
+    >
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ duration: 0.24, ease: [0.25, 0.1, 0.25, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        role="menu"
+        aria-label={`Actions for ${member.name}`}
+        className="w-full max-w-md rounded-t-2xl border-t border-slate-700 bg-[#111827] px-4 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-2 shadow-2xl shadow-black/60"
+      >
+        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-700" />
+
+        {/* Member summary */}
+        <div className="flex items-center gap-3 px-1 pb-2 pt-1">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[12px] font-bold text-white shadow-sm shadow-blue-900/30">
+            {member.avatar}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-semibold text-slate-100">
+              {member.name}
+            </p>
+            <p className="truncate text-[12px] text-slate-500">
+              {getMobileMemberSublabel(member)}
+            </p>
+          </div>
+          <div className="ml-auto shrink-0">
+            <StatusBadge status={member.status} />
+          </div>
+        </div>
+
+        {/* Actions — same destinations/flows as before */}
+        <div className="space-y-0.5 border-t border-slate-700/50 pt-2">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => onEdit(member.id)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] font-medium text-slate-200 transition-colors hover:bg-slate-800 active:bg-slate-800"
+          >
+            <Pencil className="h-[18px] w-[18px] text-blue-400" />
+            Edit member
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => onRenew(member.id)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] font-medium text-slate-200 transition-colors hover:bg-slate-800 active:bg-slate-800"
+          >
+            <Repeat className="h-[18px] w-[18px] text-blue-400" />
+            Renew membership
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => onDelete(member.id)}
+            disabled={isDeleting === member.id}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] font-semibold text-red-400 transition-colors hover:bg-red-950/30 active:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isDeleting === member.id ? (
+              <Loader2 className="h-[18px] w-[18px] animate-spin" />
+            ) : (
+              <Trash2 className="h-[18px] w-[18px]" />
+            )}
+            Delete member
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800/60 py-2.5 text-[14px] font-semibold text-slate-300 transition-colors hover:bg-slate-800 active:scale-[0.99]"
+        >
+          Cancel
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }

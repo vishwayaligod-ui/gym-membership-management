@@ -2,7 +2,18 @@
 
 import { motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, Search, DollarSign, FileText, Percent, ArrowLeft, CheckCircle2, AlertCircle, Tag, Loader2 } from "lucide-react";
+import {
+  CalendarDays,
+  Search,
+  DollarSign,
+  FileText,
+  Percent,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  Tag,
+  Loader2,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useState, useMemo, useEffect } from "react";
@@ -38,10 +49,13 @@ const schema = z.object({
   newPlan: z.string().min(1, "Select a new plan"),
   duration: z.string().min(1, "Select a duration"),
   startDate: z.string().min(1, "Start date is required"),
-  renewalAmount: z.string().min(1, "Renewal amount is required").refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
-    "Amount must be a valid number greater than 0"
-  ),
+  renewalAmount: z
+    .string()
+    .min(1, "Renewal amount is required")
+    .refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
+      "Amount must be a valid number greater than 0"
+    ),
   discount: z.string().optional().or(z.literal("")),
   paymentMethod: z.string().min(1, "Select a payment method"),
   notes: z.string().optional().or(z.literal("")),
@@ -77,10 +91,25 @@ function addMonthsToDate(dateStr: string, months: number): string {
   const date = new Date(dateStr);
   date.setMonth(date.getMonth() + months);
 
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
   const month = monthNames[date.getMonth()];
   const day = date.getDate();
   const year = date.getFullYear();
+
   return `${month} ${day}, ${year}`;
 }
 
@@ -89,11 +118,17 @@ function calculateDaysExtended(oldDate: string, newDate: string): number {
   const newD = new Date(newDate);
   const diffTime = Math.abs(newD.getTime() - old.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
   return diffDays;
 }
 
-export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
+export function RenewalForm({
+  initialMemberId,
+}: {
+  initialMemberId?: string;
+}) {
   const router = useRouter();
+
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
@@ -108,9 +143,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
         const url = initialMemberId
           ? `/api/renewals?memberId=${encodeURIComponent(initialMemberId)}`
           : "/api/renewals";
+
         const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to fetch");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch");
+        }
+
         const data = await response.json();
+
         const memberOptions: MemberOption[] = data.renewals.map((r: any) => ({
           id: r.id,
           memberId: r.memberId,
@@ -122,6 +163,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
           membershipId: r.membershipId,
           planId: r.planId,
         }));
+
         setMembers(memberOptions);
       } catch (error) {
         console.error("Failed to fetch members:", error);
@@ -134,12 +176,19 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
     async function fetchPlans() {
       try {
         const response = await fetch("/api/membership-plans");
-        if (!response.ok) throw new Error("Failed to fetch plans");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch plans");
+        }
+
         const data = await response.json();
+
         setPlans(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Failed to fetch plans:", error);
-        toast.error("Failed to load membership plans. Please refresh the page.");
+        toast.error(
+          "Failed to load membership plans. Please refresh the page."
+        );
       } finally {
         setIsLoadingPlans(false);
       }
@@ -166,6 +215,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
   const discountStr = watch("discount");
   const renewalAmountStr = watch("renewalAmount");
   const startDate = watch("startDate");
+  const paymentMethod = watch("paymentMethod");
 
   const selectedMember = useMemo(
     () => members.find((member) => member.id === memberId) || null,
@@ -181,6 +231,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
     () =>
       members.filter((member) => {
         const query = searchQuery.toLowerCase();
+
         return (
           member.name.toLowerCase().includes(query) ||
           member.phone.includes(query)
@@ -190,35 +241,68 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
   );
 
   const endDate = useMemo(() => {
-    if (!startDate || !duration) return "";
+    if (!startDate || !duration) {
+      return "";
+    }
+
     const durationMonthsValue = durationMonths[duration] || 0;
     const startDateObj = new Date(startDate);
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
     const month = monthNames[startDateObj.getMonth()];
     const day = startDateObj.getDate();
     const year = startDateObj.getFullYear();
+
     const currentFormatDate = `${month} ${day}, ${year}`;
+
     return addMonthsToDate(currentFormatDate, durationMonthsValue);
   }, [startDate, duration]);
 
   const finalAmount = useMemo(() => {
-    if (!renewalAmountStr) return 0;
+    if (!renewalAmountStr) {
+      return 0;
+    }
+
     const amount = parseFloat(renewalAmountStr);
     const discount = discountStr ? parseFloat(discountStr) : 0;
+
     return Math.max(0, amount - discount);
   }, [renewalAmountStr, discountStr]);
 
   const daysExtended = useMemo(() => {
-    if (!selectedMember || !endDate) return 0;
+    if (!selectedMember || !endDate) {
+      return 0;
+    }
+
     return calculateDaysExtended(selectedMember.expiresOn, endDate);
   }, [selectedMember, endDate]);
 
   // Auto-select the member when initialMemberId is provided
   useEffect(() => {
     if (initialMemberId && members.length > 0) {
-      const matchedMember = members.find((m) => m.memberId === initialMemberId);
+      const matchedMember = members.find(
+        (m) => m.memberId === initialMemberId
+      );
+
       if (matchedMember) {
-        setValue("memberId", matchedMember.id, { shouldValidate: true });
+        setValue("memberId", matchedMember.id, {
+          shouldValidate: true,
+        });
+
         setSearchQuery(matchedMember.name);
         setShowMemberDropdown(false);
       }
@@ -226,34 +310,53 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
   }, [initialMemberId, members, setValue]);
 
   const handleMemberSelect = (member: MemberOption) => {
-    setValue("memberId", member.id, { shouldValidate: true });
+    setValue("memberId", member.id, {
+      shouldValidate: true,
+    });
+
     setSearchQuery(member.name);
     setShowMemberDropdown(false);
   };
 
+  const handlePaymentMethodSelect = (method: string) => {
+    setValue("paymentMethod", method, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
   const onSubmit = async (values: FormValues) => {
     if (!selectedMember) {
-      toast.error("Please select a member before renewing the membership.");
+      toast.error(
+        "Please select a member before renewing the membership."
+      );
       return;
     }
 
     if (!selectedPlan) {
-      toast.error("Please select a valid membership plan before saving.");
+      toast.error(
+        "Please select a valid membership plan before saving."
+      );
       return;
     }
 
     setIsSaving(true);
+
     try {
       const response = await fetch("/api/renewals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           membershipId: selectedMember.membershipId,
           planId: selectedPlan.id,
           startDate: values.startDate,
           endDate,
           amount: Number.parseFloat(values.renewalAmount),
-          discount: values.discount ? Number.parseFloat(values.discount) : 0,
+          discount: values.discount
+            ? Number.parseFloat(values.discount)
+            : 0,
           finalAmount,
           paymentMethod: values.paymentMethod,
           notes: values.notes?.trim() || "",
@@ -263,7 +366,9 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to renew membership");
+        throw new Error(
+          data?.error || "Failed to renew membership"
+        );
       }
 
       toast.success("Membership renewed successfully!", {
@@ -273,7 +378,10 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
       router.push("/members");
     } catch (error) {
       toast.error("Failed to renew membership", {
-        description: error instanceof Error ? error.message : "Please try again",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please try again",
       });
     } finally {
       setIsSaving(false);
@@ -287,6 +395,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Toaster position="top-right" richColors closeButton />
+
       <AppHeader title="Renew Membership" />
 
       <PageContainer>
@@ -304,13 +413,24 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
+
             <div>
-              <p className="text-2xl font-semibold tracking-tight text-slate-100">Renew Membership</p>
-              <p className="mt-1 text-sm text-slate-500">Extend the member’s subscription with a new plan and payment.</p>
+              <p className="text-2xl font-semibold tracking-tight text-slate-100">
+                Renew Membership
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Extend the member’s subscription with a new plan and
+                payment.
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-4"
+            noValidate
+          >
             <input type="hidden" {...register("memberId")} />
 
             <motion.section
@@ -323,18 +443,29 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                 <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-400">
                   <Search className="h-4 w-4" />
                 </div>
+
                 <div>
-                  <p className="text-base font-semibold text-slate-100">Select Member</p>
-                  <p className="text-sm text-slate-500">Find the member to renew</p>
+                  <p className="text-base font-semibold text-slate-100">
+                    Select Member
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Find the member to renew
+                  </p>
                 </div>
               </div>
 
               <div className="relative">
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5">
                   <Search className="h-4 w-4 text-slate-500" />
+
                   <input
                     type="text"
-                    placeholder={isLoadingMembers ? "Loading members..." : "Search by name or phone..."}
+                    placeholder={
+                      isLoadingMembers
+                        ? "Loading members..."
+                        : "Search by name or phone..."
+                    }
                     value={searchQuery}
                     onChange={(event) => {
                       setSearchQuery(event.target.value);
@@ -350,7 +481,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="absolute top-full left-0 right-0 z-10 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 shadow-lg"
+                    className="absolute left-0 right-0 top-full z-10 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 shadow-lg"
                   >
                     {filteredMembers.map((member) => (
                       <button
@@ -359,8 +490,13 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                         onClick={() => handleMemberSelect(member)}
                         className="w-full border-b border-slate-800 px-4 py-3 text-left hover:bg-slate-800 last:border-b-0"
                       >
-                        <p className="font-medium text-slate-100">{member.name}</p>
-                        <p className="text-sm text-slate-500">{member.plan} · {member.phone}</p>
+                        <p className="font-medium text-slate-100">
+                          {member.name}
+                        </p>
+
+                        <p className="text-sm text-slate-500">
+                          {member.plan} · {member.phone}
+                        </p>
                       </button>
                     ))}
                   </motion.div>
@@ -368,7 +504,9 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
               </div>
 
               {errors.memberId && (
-                <p className="mt-2 text-sm text-rose-400">{errors.memberId.message}</p>
+                <p className="mt-2 text-sm text-rose-400">
+                  {errors.memberId.message}
+                </p>
               )}
             </motion.section>
 
@@ -383,9 +521,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                   <div className="rounded-2xl bg-emerald-600/10 p-2 text-emerald-400">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>
+
                   <div>
-                    <p className="text-base font-semibold text-slate-100">Member Summary</p>
-                    <p className="text-sm text-slate-500">Current membership details</p>
+                    <p className="text-base font-semibold text-slate-100">
+                      Member Summary
+                    </p>
+
+                    <p className="text-sm text-slate-500">
+                      Current membership details
+                    </p>
                   </div>
                 </div>
 
@@ -393,9 +537,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Member</p>
-                        <p className="mt-1.5 text-base font-semibold text-slate-100">{selectedMember.name}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          Member
+                        </p>
+
+                        <p className="mt-1.5 text-base font-semibold text-slate-100">
+                          {selectedMember.name}
+                        </p>
                       </div>
+
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-xs font-semibold text-white">
                         {selectedMember.avatar}
                       </div>
@@ -404,24 +554,46 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Current Plan</p>
-                      <p className="mt-1.5 text-sm font-medium text-slate-100">{selectedMember.plan}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        Current Plan
+                      </p>
+
+                      <p className="mt-1.5 text-sm font-medium text-slate-100">
+                        {selectedMember.plan}
+                      </p>
                     </div>
+
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Current Expiry</p>
-                      <p className="mt-1.5 text-sm font-medium text-slate-100">{selectedMember.expiresOn}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        Current Expiry
+                      </p>
+
+                      <p className="mt-1.5 text-sm font-medium text-slate-100">
+                        {selectedMember.expiresOn}
+                      </p>
                     </div>
                   </div>
 
                   {endDate && (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-blue-900/40 bg-blue-950/30 p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-400">New Expiry</p>
-                        <p className="mt-1.5 text-sm font-medium text-blue-200">{endDate}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-400">
+                          New Expiry
+                        </p>
+
+                        <p className="mt-1.5 text-sm font-medium text-blue-200">
+                          {endDate}
+                        </p>
                       </div>
+
                       <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/30 p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">Days Extended</p>
-                        <p className="mt-1.5 text-sm font-medium text-emerald-200">{daysExtended} days</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400">
+                          Days Extended
+                        </p>
+
+                        <p className="mt-1.5 text-sm font-medium text-emerald-200">
+                          {daysExtended} days
+                        </p>
                       </div>
                     </div>
                   )}
@@ -439,30 +611,52 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                 <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-400">
                   <Tag className="h-4 w-4" />
                 </div>
+
                 <div>
-                  <p className="text-base font-semibold text-slate-100">Renewal Details</p>
-                  <p className="text-sm text-slate-500">Plan and duration</p>
+                  <p className="text-base font-semibold text-slate-100">
+                    Renewal Details
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Plan and duration
+                  </p>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="New Plan" name="newPlan" required error={errors.newPlan?.message}>
+                <FormField
+                  label="New Plan"
+                  name="newPlan"
+                  required
+                  error={errors.newPlan?.message}
+                >
                   <select
                     id="newPlan"
                     {...register("newPlan")}
                     className="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-blue-500 focus:bg-slate-900"
                     disabled={isLoadingPlans}
                   >
-                    <option value="">{isLoadingPlans ? "Loading plans..." : "Select a plan"}</option>
+                    <option value="">
+                      {isLoadingPlans
+                        ? "Loading plans..."
+                        : "Select a plan"}
+                    </option>
+
                     {plans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.name} - ₹{plan.price.toLocaleString("en-IN")}
+                        {plan.name} - ₹
+                        {plan.price.toLocaleString("en-IN")}
                       </option>
                     ))}
                   </select>
                 </FormField>
 
-                <FormField label="Duration" name="duration" required error={errors.duration?.message}>
+                <FormField
+                  label="Duration"
+                  name="duration"
+                  required
+                  error={errors.duration?.message}
+                >
                   <select
                     id="duration"
                     {...register("duration")}
@@ -478,9 +672,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
               </div>
 
               <div className="grid gap-4 pt-4 md:grid-cols-2">
-                <FormField label="Start Date" name="startDate" required error={errors.startDate?.message}>
+                <FormField
+                  label="Start Date"
+                  name="startDate"
+                  required
+                  error={errors.startDate?.message}
+                >
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-slate-900">
                     <CalendarDays className="h-4 w-4 text-slate-500" />
+
                     <input
                       id="startDate"
                       type="date"
@@ -490,7 +690,11 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                   </div>
                 </FormField>
 
-                <FormField label="End Date" name="endDate" hint="Auto-calculated from duration">
+                <FormField
+                  label="End Date"
+                  name="endDate"
+                  hint="Auto-calculated from duration"
+                >
                   <input
                     id="endDate"
                     type="text"
@@ -512,9 +716,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                 <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-400">
                   <DollarSign className="h-4 w-4" />
                 </div>
+
                 <div>
-                  <p className="text-base font-semibold text-slate-100">Payment Information</p>
-                  <p className="text-sm text-slate-500">Amount and payment method</p>
+                  <p className="text-base font-semibold text-slate-100">
+                    Payment Information
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Amount and payment method
+                  </p>
                 </div>
               </div>
 
@@ -527,7 +737,11 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                 >
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-slate-900">
                     <DollarSign className="h-4 w-4 text-slate-500" />
-                    <span className="text-sm font-medium text-slate-400">₹</span>
+
+                    <span className="text-sm font-medium text-slate-400">
+                      ₹
+                    </span>
+
                     <input
                       id="renewalAmount"
                       type="number"
@@ -539,10 +753,18 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                   </div>
                 </FormField>
 
-                <FormField label="Discount" name="discount" hint="Optional">
+                <FormField
+                  label="Discount"
+                  name="discount"
+                  hint="Optional"
+                >
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-slate-900">
                     <Percent className="h-4 w-4 text-slate-500" />
-                    <span className="text-sm font-medium text-slate-400">₹</span>
+
+                    <span className="text-sm font-medium text-slate-400">
+                      ₹
+                    </span>
+
                     <input
                       id="discount"
                       type="number"
@@ -557,25 +779,59 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
 
               <div className="mt-4 rounded-2xl border border-blue-900/40 bg-blue-950/30 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-300">Final Amount</p>
-                  <p className="text-2xl font-bold text-blue-300">₹{finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-sm font-medium text-slate-300">
+                    Final Amount
+                  </p>
+
+                  <p className="text-2xl font-bold text-blue-300">
+                    ₹
+                    {finalAmount.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
                 </div>
               </div>
 
               <div className="mt-4">
-                <FormField label="Payment Method" name="paymentMethod" required error={errors.paymentMethod?.message}>
-                  <select
-                    id="paymentMethod"
-                    {...register("paymentMethod")}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-blue-500 focus:bg-slate-900"
-                  >
-                    <option value="">Select payment method</option>
-                    {paymentMethods.map((method) => (
-                      <option key={method.value} value={method.value}>
-                        {method.icon} {method.label}
-                      </option>
-                    ))}
-                  </select>
+                <FormField
+                  label="Payment Method"
+                  name="paymentMethod"
+                  required
+                  error={errors.paymentMethod?.message}
+                >
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {paymentMethods.map((method) => {
+                      const isSelected =
+                        paymentMethod === method.value;
+
+                      return (
+                        <button
+                          key={method.value}
+                          type="button"
+                          onClick={() =>
+                            handlePaymentMethodSelect(method.value)
+                          }
+                          className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-3 text-sm font-semibold transition ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-600/15 text-blue-300 shadow-[0_0_0_1px_rgba(59,130,246,0.15)]"
+                              : "border-slate-700 bg-slate-950/70 text-slate-400 hover:border-slate-600 hover:bg-slate-900 hover:text-slate-200"
+                          }`}
+                          aria-pressed={isSelected}
+                        >
+                          <span className="text-xl leading-none">
+                            {method.icon}
+                          </span>
+
+                          <span>{method.label}</span>
+
+                          {isSelected && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-400" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </FormField>
               </div>
             </motion.section>
@@ -590,9 +846,15 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
                 <div className="rounded-2xl bg-blue-600/10 p-2 text-blue-400">
                   <FileText className="h-4 w-4" />
                 </div>
+
                 <div>
-                  <p className="text-base font-semibold text-slate-100">Additional Notes</p>
-                  <p className="text-sm text-slate-500">Optional details</p>
+                  <p className="text-base font-semibold text-slate-100">
+                    Additional Notes
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Optional details
+                  </p>
                 </div>
               </div>
 
@@ -604,6 +866,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
               >
                 <div className="flex items-start gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-slate-900">
                   <FileText className="mt-0.5 h-4 w-4 text-slate-500" />
+
                   <textarea
                     id="notes"
                     {...register("notes")}
@@ -628,6 +891,7 @@ export function RenewalForm({ initialMemberId }: { initialMemberId?: string }) {
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
                 disabled={isSaving || !selectedMember || !selectedPlan}

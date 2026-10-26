@@ -137,7 +137,9 @@ export default function PaymentHistoryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    // Mobile (<lg): tighter vertical rhythm plus iPhone/Android bottom safe-area
+    // clearance (same convention as app/settings). Desktop (lg+) spacing unchanged.
+    <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:space-y-6 lg:pb-0">
       <Toaster position="top-right" richColors closeButton />
 
       {/* ═══════════════════════════════════════════
@@ -150,10 +152,12 @@ export default function PaymentHistoryPage() {
         className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">
+          {/* Mobile: compact 22px title; desktop (lg+) keeps the original text-2xl */}
+          <h1 className="text-[22px] font-extrabold tracking-tight text-slate-100 lg:text-2xl">
             Payment History
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          {/* Mobile: subtitle hidden to save vertical space; desktop unchanged */}
+          <p className="mt-1 hidden text-sm text-slate-500 lg:block">
             Track all payments across the gym.
           </p>
         </div>
@@ -162,84 +166,85 @@ export default function PaymentHistoryPage() {
       {/* ═══════════════════════════════════════════
          TOP SUMMARY CARDS
          ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Mobile: compact 2x2 metrics (same data, tighter gap); desktop (lg+) unchanged */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:gap-3">
         <FadeUp delay={0.05}>
           <motion.div
             whileHover={{ y: -3, transition: { duration: 0.15 } }}
-            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-2.5 transition-all hover:border-slate-600/60 hover:bg-slate-800/60 lg:p-[18px]"
           >
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-900/30">
-                <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-900/30 lg:h-7 lg:w-7 lg:rounded-lg">
+                <DollarSign className="h-3 w-3 text-emerald-400 lg:h-3.5 lg:w-3.5" />
               </div>
               <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
                 Today's Revenue
               </span>
             </div>
-            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+            <p className="mt-1 truncate text-[15px] font-semibold tabular-nums text-slate-100 lg:mt-2 lg:whitespace-normal lg:text-[24px]">
               {isLoading ? "..." : formatCurrency(summary.todayRevenue)}
             </p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Payments received today</p>
+            <p className="mt-0.5 hidden text-[10px] text-slate-500 lg:block">Payments received today</p>
           </motion.div>
         </FadeUp>
 
         <FadeUp delay={0.1}>
           <motion.div
             whileHover={{ y: -3, transition: { duration: 0.15 } }}
-            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-2.5 transition-all hover:border-slate-600/60 hover:bg-slate-800/60 lg:p-[18px]"
           >
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-900/30">
-                <TrendingUp className="h-3.5 w-3.5 text-blue-400" />
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-900/30 lg:h-7 lg:w-7 lg:rounded-lg">
+                <TrendingUp className="h-3 w-3 text-blue-400 lg:h-3.5 lg:w-3.5" />
               </div>
               <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
                 This Week
               </span>
             </div>
-            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+            <p className="mt-1 truncate text-[15px] font-semibold tabular-nums text-slate-100 lg:mt-2 lg:whitespace-normal lg:text-[24px]">
               {isLoading ? "..." : formatCurrency(summary.weeklyRevenue)}
             </p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Weekly revenue</p>
+            <p className="mt-0.5 hidden text-[10px] text-slate-500 lg:block">Weekly revenue</p>
           </motion.div>
         </FadeUp>
 
         <FadeUp delay={0.15}>
           <motion.div
             whileHover={{ y: -3, transition: { duration: 0.15 } }}
-            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-2.5 transition-all hover:border-slate-600/60 hover:bg-slate-800/60 lg:p-[18px]"
           >
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-900/30">
-                <Calendar className="h-3.5 w-3.5 text-purple-400" />
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-purple-900/30 lg:h-7 lg:w-7 lg:rounded-lg">
+                <Calendar className="h-3 w-3 text-purple-400 lg:h-3.5 lg:w-3.5" />
               </div>
               <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
                 This Month
               </span>
             </div>
-            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+            <p className="mt-1 truncate text-[15px] font-semibold tabular-nums text-slate-100 lg:mt-2 lg:whitespace-normal lg:text-[24px]">
               {isLoading ? "..." : formatCurrency(summary.monthlyRevenue)}
             </p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Monthly revenue</p>
+            <p className="mt-0.5 hidden text-[10px] text-slate-500 lg:block">Monthly revenue</p>
           </motion.div>
         </FadeUp>
 
         <FadeUp delay={0.2}>
           <motion.div
             whileHover={{ y: -3, transition: { duration: 0.15 } }}
-            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-[18px] transition-all hover:border-slate-600/60 hover:bg-slate-800/60"
+            className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-2.5 transition-all hover:border-slate-600/60 hover:bg-slate-800/60 lg:p-[18px]"
           >
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-900/30">
-                <Clock className="h-3.5 w-3.5 text-amber-400" />
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-900/30 lg:h-7 lg:w-7 lg:rounded-lg">
+                <Clock className="h-3 w-3 text-amber-400 lg:h-3.5 lg:w-3.5" />
               </div>
               <span className="text-[9px] font-medium uppercase tracking-[0.06em] text-slate-500">
                 Pending
               </span>
             </div>
-            <p className="mt-2 text-[24px] font-semibold tabular-nums text-slate-100">
+            <p className="mt-1 truncate text-[15px] font-semibold tabular-nums text-slate-100 lg:mt-2 lg:whitespace-normal lg:text-[24px]">
               {isLoading ? "..." : `${summary.pendingCount} (${formatCurrency(summary.pendingAmount)})`}
             </p>
-            <p className="mt-0.5 text-[10px] text-slate-500">Pending payments</p>
+            <p className="mt-0.5 hidden text-[10px] text-slate-500 lg:block">Pending payments</p>
           </motion.div>
         </FadeUp>
       </div>
@@ -248,7 +253,9 @@ export default function PaymentHistoryPage() {
          SEARCH & FILTER BAR
          ═══════════════════════════════════════════ */}
       <FadeUp delay={0.1}>
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 sm:p-5">
+        {/* Mobile: flat section (no nested card chrome) so search sits full-width on the
+            page; desktop (lg+) keeps the original card container exactly. */}
+        <div className="lg:rounded-xl lg:border lg:border-slate-700/60 lg:bg-slate-800/40 lg:p-5">
           {/* Search Row */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
@@ -263,8 +270,8 @@ export default function PaymentHistoryPage() {
             </div>
           </div>
 
-          {/* Filter Chips */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-700/40 pt-4">
+          {/* Filter Chips — mobile: compact flowing controls; desktop (lg+) unchanged */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 lg:mt-4 lg:gap-3 lg:border-t lg:border-slate-700/40 lg:pt-4">
             {/* Status Filter */}
             <div className="flex items-center gap-2">
               <label className="text-[11px] font-medium text-slate-500">Status:</label>
@@ -275,7 +282,7 @@ export default function PaymentHistoryPage() {
                     whileHover={{ scale: 1.04 }}
                     whileTap={{ scale: 0.96 }}
                     onClick={() => handleStatusFilterChange(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                    className={`rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-all lg:px-3 lg:text-[11px] ${
                       statusFilter === f.value
                         ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
                         : "border border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-200"
@@ -298,7 +305,7 @@ export default function PaymentHistoryPage() {
                     whileHover={{ scale: 1.04 }}
                     whileTap={{ scale: 0.96 }}
                     onClick={() => handleMethodFilterChange(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                    className={`rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-all lg:px-3 lg:text-[11px] ${
                       methodFilter === f.value
                         ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
                         : "border border-slate-700 bg-slate-900/50 text-slate-400 hover:border-slate-600 hover:text-slate-200"
@@ -317,7 +324,7 @@ export default function PaymentHistoryPage() {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={resetFilters}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/20 px-3 py-1.5 text-[11px] font-semibold text-red-400 transition-all hover:bg-red-950/30"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/20 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 transition-all hover:bg-red-950/30 lg:px-3 lg:text-[11px]"
                 type="button"
               >
                 Reset Filters
@@ -333,14 +340,14 @@ export default function PaymentHistoryPage() {
       <div className="flex-1 min-w-0 space-y-4">
         {isLoading ? (
           <FadeUp delay={0.15}>
-            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-12 text-center lg:py-20">
               <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
               <p className="mt-4 text-base font-semibold text-slate-300">Loading payments...</p>
             </div>
           </FadeUp>
         ) : payments.length === 0 ? (
           <FadeUp delay={0.15}>
-            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-20 text-center">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700/60 bg-slate-800/40 px-6 py-12 text-center lg:py-20">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-700/40">
                 <Banknote className="h-6 w-6 text-slate-500" />
               </div>
@@ -384,7 +391,7 @@ export default function PaymentHistoryPage() {
                         onMouseEnter={() => setHoveredRow(payment.id)}
                         onMouseLeave={() => setHoveredRow(null)}
                         onClick={() => router.push(`/payment-history/${payment.id}`)}
-                        className={`grid grid-cols-1 md:grid-cols-[56px_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_60px_40px] gap-3 px-5 py-4 transition-all duration-200 cursor-pointer ${
+                        className={`grid grid-cols-1 gap-3 px-3 py-2.5 transition-all duration-200 cursor-pointer md:grid-cols-[56px_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1.2fr)_60px_40px] md:px-5 md:py-4 ${
                           hoveredRow === payment.id ? "bg-slate-700/40 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-transparent"
                         }`}
                       >
@@ -395,25 +402,25 @@ export default function PaymentHistoryPage() {
                           </div>
                         </div>
 
-                        {/* Mobile Row */}
-                        <div className="flex items-center gap-3 md:hidden">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[11px] font-bold text-white shadow-sm shadow-blue-900/30">
+                        {/* Mobile Row — compact professional list */}
+                        <div className="flex items-center gap-2.5 md:hidden">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-[11px] font-bold text-white shadow-sm shadow-blue-900/30">
                             {payment.avatar}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-slate-200 truncate">{payment.memberName}</p>
-                              <span className={`inline-flex items-center gap-1 rounded-full ${statusColors.bg} px-2 py-0.5 text-[10px] font-bold ${statusColors.text} whitespace-nowrap`}>
+                              <p className="text-[13px] font-semibold text-slate-200 truncate">{payment.memberName}</p>
+                              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full ${statusColors.bg} px-2 py-0.5 text-[10px] font-bold ${statusColors.text} whitespace-nowrap`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
                                 {payment.paymentStatus}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{payment.memberPhone}</p>
-                            <div className="flex items-center gap-2 mt-1.5">
+                            <p className="text-[11px] text-slate-500 mt-0.5 truncate">{payment.memberPhone}</p>
+                            <div className="mt-1 flex items-center justify-between gap-2">
                               <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${modeColor}`}>
                                 {paymentModeLabels[payment.paymentMode]}
                               </span>
-                              <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                              <span className="text-[13px] font-semibold tabular-nums text-slate-100 whitespace-nowrap">
                                 {formatCurrency(payment.amount)}
                               </span>
                             </div>

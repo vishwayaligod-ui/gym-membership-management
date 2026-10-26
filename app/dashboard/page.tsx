@@ -11,8 +11,9 @@ import {
   UserPlus,
   CreditCard,
   CheckCircle2,
+  Clock3,
   TrendingUp,
-  Bell,
+  CalendarClock,
   ArrowRight,
   Loader2,
   AlertCircle,
@@ -330,9 +331,210 @@ export default function DashboardPage() {
     });
   }
 
+  // Needs Attention rows — derived from the same existing dashboard data sources (receptionist action list,
+  const attentionRows: {
+    icon: typeof UserPlus;
+    chip: string;
+    valueColor: string;
+    label: string;
+    sub: string;
+    value: number;
+    route: string;
+  }[] = [];
+
+  if (stats.expiringSoon > 0) {
+    attentionRows.push({
+      icon: CalendarClock,
+      chip: "bg-amber-900/30 text-amber-400",
+      valueColor: "text-amber-400",
+      label: "Memberships expiring",
+      sub: "Renewals due within30 days",
+      value: stats.expiringSoon,
+      route: "/renewals",
+    });
+  }
+
+  if (pendingPayments.length > 0) {
+
+    attentionRows.push({
+      icon: CreditCard,
+      chip: "bg-[var(--primary)]/10 text-[var(--primary)]",
+      valueColor: "text-[var(--primary)]",
+      label: "Payments pending",
+      sub: "Latest transactions to review",
+      value: pendingPayments.length,
+      route: "/payment-history",
+    });
+  }
+
+  if (stats.expiredMembers > 0) {
+    attentionRows.push({
+      icon: AlertCircle,
+      chip: "bg-red-900/30 text-red-400",
+      valueColor: "text-red-400",
+      label: "Expired memberships",
+      sub: "Members need reactivation",
+      value: stats.expiredMembers,
+      route: "/renewals",
+    });
+  }
+
+  if (stats.currentActiveCheckIns > 0) {
+    attentionRows.push({
+      icon: Activity,
+      chip: "bg-emerald-900/30 text-emerald-400",
+      valueColor: "text-emerald-400",
+      label: "In gym now",
+      sub: "Active check-ins right now",
+      value: stats.currentActiveCheckIns,
+      route: "/attendance",
+    });
+  }
+
   return (
-    <div className="space-y-8">
-      {/* ── HERO SECTION ── */}
+    <>
+      {/* ── MOBILE DASHBOARD — Focus Fitness command center (phones only,< sm breakpoint ── */}
+      <div className="space-y-3 sm:hidden">
+        {/* Greeting */}
+        <div className="px-0.5">
+          <p className="text-[13px] font-semibold text-[#94A3B8]">{greeting} 👋</p>
+          <h1 className="mt-0.5 text-[20px] font-extrabold leading-tight tracking-tight text-[#F8FAFC]">
+            {gymName || "Focus Fitness"}
+          </h1>
+          <p className="mt-1 text-[13px] leading-snug text-[#64748B]">
+            Let&apos;s build stronger members today.</p>
+        </div>
+
+        {/* Key stats — 2-column receptionist blocks */}
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Today's Attendance", value: String(stats.todayCheckIns), icon: Activity },
+            { label: "Today's Revenue", value: formatCurrency(stats.todayRevenue), icon: IndianRupee },
+          ].map((stat, idx) => {
+            const StatIcon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 + idx * 0.06 }}
+                className="flex items-center gap-3 rounded-xl border border-[#334155] bg-[#1E293B] px-3 py-2.5"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                  <StatIcon className="h-[16px] w-[16px]" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[16px] font-bold leading-tight tracking-tight text-[#F8FAFC]">{stat.value}</span>
+                  <span className="mt-0.5 block text-[11px] font-medium leading-tight text-[#64748B]">{stat.label}</span>
+                </span>
+              </motion.div>
+            );
+          })}
+
+          {/* Active Members — full-width horizontal tile */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.22 }}
+            className="col-span-2 flex items-center justify-between rounded-xl border border-[#334155] bg-[#1E293B] px-3 py-2.5"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-900/30 text-emerald-400">
+                <UserCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[13px] font-bold leading-tight text-[#F8FAFC]">Active Members</p>
+                <p className="text-[11px] text-[#64748B]">{stats.totalMembers} total members</p>
+              </div>
+            </div>
+            <p className="text-[16px] font-bold text-[#F8FAFC]">{stats.activeMembers}</p>
+          </motion.div>
+        </div>
+
+        <section className="overflow-hidden rounded-xl border border-[#334155] bg-[#1E293B]">
+          <div className="flex items-center justify-between border-b border-[#334155]/50 px-3 py-2.5">
+            <h2 className="text-[13px] font-bold text-[#F8FAFC]">Needs Attention</h2>
+            <button
+              type="button"
+              onClick={() => router.push("/renewals")}
+              className="flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]"
+            >
+              View All
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+
+          <div className="divide-y divide-[#334155]/40">
+            {attentionRows.length > 0 ? (
+              attentionRows.map((row, idx) => {
+                const RowIcon = row.icon;
+                return (
+                  <motion.button
+                    key={row.label}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.25, delay: 0.15 + idx * 0.05 }}
+                    type="button"
+                    onClick={() => router.push(row.route)}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors active:bg-[#273449]/60"
+                  >
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${row.chip}`}>
+                      <RowIcon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold text-[#F8FAFC]">{row.label}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-[#64748B]">{row.sub}</span>
+                    </span>
+                    <span className={`shrink-0 text-[14px] font-bold ${row.valueColor}`}>{row.value}</span>
+                  </motion.button>
+                );
+              })
+            ) : (
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <CheckCircle2 className="h-[18px] w-[18px] shrink-0 text-emerald-400" />
+                <p className="text-[13px] font-medium text-[#94A3B8]">
+                  All clear — nothing needs your attention today.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="px-0.5 text-[13px] font-bold text-[#F8FAFC]">Quick Actions</h2>
+
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Add Member", icon: UserPlus, route: "/members/add" },
+              { label: "Check-in", icon: Clock3, route: "/attendance" },
+              { label: "Renewal", icon: CheckCircle2, route: "/renewals/add" },
+              { label: "Payment", icon: CreditCard, route: "/payment-history/add" },
+            ].map((action, idx) => {
+              const ActionIcon = action.icon;
+              return (
+                <motion.button
+                  key={action.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 + idx * 0.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  type="button"
+                  onClick={() => router.push(action.route)}
+                  className="flex items-center gap-3 rounded-xl border border-[#334155] bg-[#1E293B] px-3 py-2.5 text-left transition-colors active:border-[var(--primary)]/40 active:bg-[#273449]"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                    <ActionIcon className="h-[16px] w-[16px]" />
+                  </span>
+                  <span className="text-[13px] font-semibold leading-tight text-[#F8FAFC]">{action.label}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      {/* ── EXISTING DASHBOARD — tablet+ (unchanged ── */}
+      <div className="hidden space-y-8 sm:block">
+        {/* ── HERO SECTION ── */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -362,7 +564,7 @@ export default function DashboardPage() {
             </h1>
             <p className="mt-2 text-sm text-white/80">{dateString}</p>
             <p className="mt-3 text-base font-medium text-white/70">
-              &ldquo;Let's build stronger members today.&rdquo;
+              &ldquo;Let&apos;s build stronger members today.&rdquo;
             </p>
           </motion.div>
 
@@ -577,7 +779,7 @@ export default function DashboardPage() {
                 <Activity className="h-4 w-4 text-[var(--primary)]" />
               </div>
               <div>
-                <p className="text-base font-bold text-[#F8FAFC]">Today's Attendance</p>
+                <p className="text-base font-bold text-[#F8FAFC]">Today&apos;s Attendance</p>
                 <p className="text-xs text-[#64748B] mt-0.5">Peak hours breakdown</p>
               </div>
             </div>
@@ -929,7 +1131,8 @@ export default function DashboardPage() {
           )}
         </div>
       </motion.section>
-    </div>
+      </div>
+    </>
   );
 }
 
