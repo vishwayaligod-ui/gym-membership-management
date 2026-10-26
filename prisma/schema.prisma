@@ -33,6 +33,21 @@ enum MemberStatus {
   FROZEN
 }
 
+enum EnquiryStatus {
+  PENDING
+  CONTACTED
+  CONVERTED
+  NOT_INTERESTED
+}
+
+enum EnquiryFollowUpOutcome {
+  CONTACTED
+  NO_ANSWER
+  CALLBACK_REQUESTED
+  CONVERTED
+  NOT_INTERESTED
+}
+
 enum MembershipStatus {
   ACTIVE
   EXPIRED
@@ -127,6 +142,7 @@ model Gym {
   ptSessions      PTSession[]
   settings        GymSettings?
   settingsBackups GymSettingsBackup[]
+  enquiries       Enquiry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -256,6 +272,7 @@ model Branch {
   workoutPlans WorkoutPlan[]
   dietPlans    DietPlan[]
   ptSessions   PTSession[]
+  enquiries    Enquiry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -286,12 +303,57 @@ model User {
   trainerProfile     TrainerProfile?
   createdAttendances Attendance[]    @relation("AttendanceCreatedBy")
   createdExpenses    Expense[]       @relation("ExpenseCreatedBy")
+  recordedEnquiryFollowUps EnquiryFollowUp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([gymId])
   @@index([branchId])
+}
+
+model Enquiry {
+  id String @id @default(uuid())
+
+  gymId String
+  gym   Gym    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name           String
+  mobileNumber   String
+  nextFollowUpAt DateTime?
+  notes          String?
+  status         EnquiryStatus @default(PENDING)
+
+  followUps EnquiryFollowUp[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gymId, branchId, status, nextFollowUpAt])
+  @@index([branchId])
+}
+
+model EnquiryFollowUp {
+  id String @id @default(uuid())
+
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  outcome        EnquiryFollowUpOutcome
+  notes          String?
+  contactedAt    DateTime
+  nextFollowUpAt DateTime?
+
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, contactedAt])
+  @@index([recordedById])
 }
 
 model TrainerProfile {
@@ -721,4 +783,3 @@ model WhatsAppMessageLog {
   @@index([status])
   @@index([type, scheduledFor])
 }
-

@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  ClipboardList,
   Users,
   CalendarCheck,
   RefreshCw,
@@ -28,6 +29,7 @@ export interface NavItem {
 
 export const mainNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", resource: "dashboard", section: "main" },
+  { label: "Enquiries", icon: ClipboardList, href: "/enquiries", resource: "enquiries", section: "main" },
   { label: "Members", icon: Users, href: "/members", resource: "members", section: "main" },
   { label: "Attendance", icon: CalendarCheck, href: "/attendance", resource: "attendance", section: "main" },
   { label: "Renewals", icon: RefreshCw, href: "/renewals", resource: "renewals", section: "main" },

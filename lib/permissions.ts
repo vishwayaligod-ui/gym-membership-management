@@ -14,7 +14,8 @@ export type PermissionResource =
   | "settings"
   | "trainers"
   | "notifications"
-  | "memberships";
+  | "memberships"
+  | "enquiries";
 
 export type PermissionAction = "read" | "create" | "update" | "delete" | "manage";
 
@@ -28,6 +29,7 @@ const receptionistResources = new Set<PermissionResource>([
   "profile",
   "notifications",
   "memberships",
+  "enquiries",
 ]);
 
 const routePermissions: Array<{ prefix: string; resource: PermissionResource }> = [
@@ -43,6 +45,7 @@ const routePermissions: Array<{ prefix: string; resource: PermissionResource }> 
   { prefix: "/trainers", resource: "trainers" },
   { prefix: "/notifications", resource: "notifications" },
   { prefix: "/memberships", resource: "memberships" },
+  { prefix: "/enquiries", resource: "enquiries" },
 ];
 
 export function getAccessRole(role?: Role | null): AccessRole {

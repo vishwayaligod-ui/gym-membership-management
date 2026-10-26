@@ -18,6 +18,7 @@ const protectedPrefixes = [
   "/profile",
   "/notifications",
   "/memberships",
+  "/enquiries",
   "/trainers",
   "/membership-plans",
   "/settings",

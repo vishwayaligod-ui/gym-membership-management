@@ -124,11 +124,13 @@ export default function LoginPage() {
                   Password
                 </label>
                 <div className="relative">
+                  {/* Chrome credential helpers inject __gcru* attributes before hydration. */}
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="Enter your password"
+                    suppressHydrationWarning
                     aria-invalid={Boolean(errors.password)}
                     aria-describedby={errors.password ? "password-error" : undefined}
                     className="w-full rounded-xl border border-[#334155] bg-[#0F172A]/50 px-4 py-3 pr-12 text-sm text-[#F8FAFC] shadow-sm outline-none transition placeholder:text-[#64748B] hover:border-[#475569] focus:border-[#3B82F6] focus:bg-[#0F172A] focus:ring-4 focus:ring-[#3B82F6]/10"

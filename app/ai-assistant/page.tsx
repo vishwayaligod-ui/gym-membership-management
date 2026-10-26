@@ -10,10 +10,11 @@ import {
   MessageCircle,
   Loader2,
   AlertCircle,
+  Scale,
 } from "lucide-react";
 import MemberProgress from "@/app/components/MemberProgress";
 
-type AssistantTab = "diet" | "progress" | "insights";
+type AssistantTab = "diet" | "progress" | "insights" | "bmi";
 
 type ChatMessage = {
   id: string;
@@ -34,6 +35,7 @@ const TABS: { id: AssistantTab; label: string; icon: typeof Dumbbell }[] = [
   { id: "diet", label: "Diet Assistant", icon: UtensilsCrossed },
   { id: "progress", label: "Member Progress", icon: TrendingUp },
   { id: "insights", label: "Gym Insights", icon: Dumbbell },
+  { id: "bmi", label: "BMI Calculator", icon: Scale },
 ];
 
 const SUGGESTIONS: { insights: string[] } = {
@@ -82,6 +84,10 @@ export default function AiAssistantPage() {
   const [formError, setFormError] = useState("");
   const [dietResult, setDietResult] = useState("");
   const [dietError, setDietError] = useState("");
+  const [bmiHeight, setBmiHeight] = useState("");
+  const [bmiWeight, setBmiWeight] = useState("");
+  const [bmiError, setBmiError] = useState("");
+  const [bmiValue, setBmiValue] = useState<number | null>(null);
 
   useEffect(() => {
     const el = chatScrollRef.current;
@@ -102,6 +108,10 @@ export default function AiAssistantPage() {
     setFormError("");
     setDietResult("");
     setDietError("");
+    setBmiHeight("");
+    setBmiWeight("");
+    setBmiError("");
+    setBmiValue(null);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -439,6 +449,122 @@ export default function AiAssistantPage() {
     </div>
   );
 
+  const handleCalculateBmi = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBmiError("");
+    const height = Number(bmiHeight);
+    const weight = Number(bmiWeight);
+
+    if (!Number.isFinite(height) || height < 80 || height > 250) {
+      setBmiError("Enter a height between 80 and 250 cm.");
+      setBmiValue(null);
+      return;
+    }
+    if (!Number.isFinite(weight) || weight < 20 || weight > 300) {
+      setBmiError("Enter a weight between 20 and 300 kg.");
+      setBmiValue(null);
+      return;
+    }
+
+    const heightInMeters = height / 100;
+    setBmiValue(weight / (heightInMeters * heightInMeters));
+  };
+
+  const bmiCategory = bmiValue === null
+    ? null
+    : bmiValue < 18.5
+      ? { label: "Underweight", style: "bg-amber-100 text-amber-800" }
+      : bmiValue < 25
+        ? { label: "Healthy range", style: "bg-emerald-100 text-emerald-800" }
+        : bmiValue < 30
+          ? { label: "Overweight", style: "bg-orange-100 text-orange-800" }
+          : { label: "Obesity", style: "bg-rose-100 text-rose-800" };
+
+  const renderBmiCalculator = () => (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-6 py-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <Scale className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">BMI Calculator</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Calculate Body Mass Index using metric units.</p>
+          </div>
+        </div>
+      </div>
+      <form onSubmit={handleCalculateBmi} className="space-y-5 px-6 py-6">
+        <div>
+          <label htmlFor="bmi-height" className={labelClasses}>Height</label>
+          <div className="relative">
+            <input
+              id="bmi-height"
+              type="number"
+              inputMode="decimal"
+              min="80"
+              max="250"
+              step="0.1"
+              required
+              value={bmiHeight}
+              onChange={(event) => {
+                setBmiHeight(event.target.value);
+                setBmiError("");
+                setBmiValue(null);
+              }}
+              placeholder="e.g. 170"
+              className={inputClasses}
+            />
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">cm</span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Valid range: 80–250 cm</p>
+        </div>
+        <div>
+          <label htmlFor="bmi-weight" className={labelClasses}>Weight</label>
+          <div className="relative">
+            <input
+              id="bmi-weight"
+              type="number"
+              inputMode="decimal"
+              min="20"
+              max="300"
+              step="0.1"
+              required
+              value={bmiWeight}
+              onChange={(event) => {
+                setBmiWeight(event.target.value);
+                setBmiError("");
+                setBmiValue(null);
+              }}
+              placeholder="e.g. 68"
+              className={inputClasses}
+            />
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">kg</span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Valid range: 20–300 kg</p>
+        </div>
+        {bmiError && (
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{bmiError}</span>
+          </div>
+        )}
+        <button type="submit" className="h-12 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700">
+          Calculate BMI
+        </button>
+        {bmiValue !== null && bmiCategory && (
+          <div aria-live="polite" className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-sm font-medium text-slate-500">Your BMI</p>
+            <p className="mt-1 text-4xl font-bold tabular-nums text-slate-950">{bmiValue.toFixed(1)}</p>
+            <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${bmiCategory.style}`}>
+              {bmiCategory.label}
+            </span>
+            <p className="mt-3 text-xs text-slate-500">BMI is a general screening measure and is not a medical diagnosis.</p>
+          </div>
+        )}
+      </form>
+    </section>
+  );
+
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-3xl flex-col px-4 -mt-7 pb-6 sm:px-6">
       {/* Header */}
@@ -452,7 +578,7 @@ export default function AiAssistantPage() {
       </div>
 
       {/* Tabs / Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -492,9 +618,9 @@ export default function AiAssistantPage() {
         )
       ) : activeTab === "progress" ? (
         <MemberProgress variant="progress" />
-      ) : (
+      ) : activeTab === "insights" ? (
         <MemberProgress variant="insights" />
-      )}
+      ) : renderBmiCalculator()}
     </main>
   );
 }

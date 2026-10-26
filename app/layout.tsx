@@ -22,13 +22,10 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
 
-  // Chrome autofill / password manager injects __gcrremoteframetoken / __gcruniqueid into the
-  // DOM before React hydrates — suppressHydrationWarning silences that attribute-mismatch noise.
   return (
     <html
       lang="en"
       className={`${inter.variable} h-full antialiased`}
-      suppressHydrationWarning
     >
       <body className="h-full">
         <SessionProvider session={session}>
